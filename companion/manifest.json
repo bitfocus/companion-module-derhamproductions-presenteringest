@@ -1,0 +1,28 @@
+{
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+	"type": "connection",
+	"id": "derhamproductions-presenteringest",
+	"name": "derhamproductions-presenteringest",
+	"shortname": "presenteringest",
+	"description": "Run a Presenter Ingest booking: presenter seats on and off, who's on their page, banners, countdowns and cues",
+	"version": "0.0.0",
+	"license": "MIT",
+	"repository": "git+https://github.com/derhamproductions/companion-module-derhamproductions-presenteringest.git",
+	"bugs": "https://github.com/derhamproductions/companion-module-derhamproductions-presenteringest/issues",
+	"maintainers": [
+		{
+			"name": "Derham Productions",
+			"email": "hello@derhamproductions.com"
+		}
+	],
+	"runtime": {
+		"type": "node22",
+		"api": "nodejs-ipc",
+		"apiVersion": "0.0.0",
+		"entrypoint": "../src/main.js"
+	},
+	"legacyIds": [],
+	"manufacturer": "Derham Productions",
+	"products": ["Presenter Ingest"],
+	"keywords": ["presenter", "remote", "vMix Call", "cue", "countdown", "timer", "GlobalCue", "event"]
+}
