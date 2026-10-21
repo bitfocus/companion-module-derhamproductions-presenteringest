@@ -7,7 +7,8 @@ jobs:
   check:
     name: Check module
 
-    if: ${{ !contains(github.repository, 'companion-module-template-') }}
+    # Bitfocus's shared workflow can only check out public repositories: skipped while this one is private
+    if: ${{ !contains(github.repository, 'companion-module-template-') && !github.event.repository.private }}
 
     permissions:
       # contents: read lets the shared workflow check out this repository while it is private
