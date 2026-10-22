@@ -38,6 +38,10 @@ Each key works for one booking only, until the booking ends. Make a new key or p
 - **Countdown**: the time (press to pause), start 1 to 30 minutes, ±1 minute, pause and clear.
 - **Banners**: each banner, and clear.
 
+**Which seats get buttons.** By default, only the seats on your booking get Seat and Cue buttons, so a 4-seat booking shows buttons for seats 1 to 4. Before you connect, the presets show seats 1 to 8 as examples.
+
+To build buttons for a set number of seats, choose it under **Preset seats** in this connection's settings (1 to 24). The buttons are there whether or not you're connected, so you can build your pages offline, or before moving to a bigger package. Buttons for seats your booking doesn't have stay dark until it does.
+
 ### Notes
 
 - The module checks the booking every second (change it under **Check every**). Presenter Ingest allows about 10 requests a second per booking, plenty for polling and button presses.

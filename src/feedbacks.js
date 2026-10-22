@@ -13,7 +13,7 @@ export const COLOURS = {
 }
 
 export function feedbackDefinitions(self) {
-	const seats = seatChoices(self.state)
+	const seats = seatChoices(self.state, false, self.presetSeats)
 	const firstSeat = seats.length ? seats[0].id : 1
 	const seatOption = {
 		id: 'seat',

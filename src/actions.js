@@ -5,8 +5,8 @@ import { bannerChoices, cueChoices, seatChoices } from './state.js'
  * `self` is the module instance (main.js): self.state, self.call(name, fn).
  */
 export function actionDefinitions(self) {
-	const seats = seatChoices(self.state)
-	const seatsAll = seatChoices(self.state, true)
+	const seats = seatChoices(self.state, false, self.presetSeats)
+	const seatsAll = seatChoices(self.state, true, self.presetSeats)
 	const firstSeat = seats.length ? seats[0].id : 1
 	const cues = cueChoices(self.state)
 	const banners = bannerChoices(self.state)

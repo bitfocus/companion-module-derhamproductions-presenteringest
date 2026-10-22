@@ -1,5 +1,5 @@
 import { COLOURS } from './feedbacks.js'
-import { bannerChoices, MAX_SEATS } from './state.js'
+import { bannerChoices, buttonSeats, OFFLINE_SEATS } from './state.js'
 
 // Short button words for the cue presets (the server's labels are longer)
 const CUE_WORDS = {
@@ -12,14 +12,33 @@ const CUE_WORDS = {
 }
 
 /**
- * Ready-made buttons, built for the booking's seats (presets are rebuilt when they change).
+ * What the seat sections say about which seats they cover, and how to change it.
+ */
+export function seatsNote(self) {
+	const fixed = Number(self.presetSeats) || 0
+	const booked = self.state.seats.length
+	const plural = (n) => `${n} seat${n === 1 ? '' : 's'}`
+	if (fixed > 0) {
+		const extra =
+			self.state.connected && booked < fixed
+				? ` Your booking has ${plural(booked)}: the buttons for the others stay dark until the booking has them.`
+				: ''
+		return `Buttons for seats 1 to ${fixed}, as set under Preset seats in this connection's settings.${extra}`
+	}
+	if (self.state.connected) {
+		return `Only the ${plural(booked)} on this booking get buttons. To build buttons for more seats (before extending to a bigger package, or while offline), set Preset seats in this connection's settings.`
+	}
+	return `Not connected yet, so these are for seats 1 to ${OFFLINE_SEATS}. Once connected, only the seats on your booking get buttons. To build buttons for a set number of seats, even offline, set Preset seats in this connection's settings.`
+}
+
+/**
+ * Ready-made buttons for the seats from buttonSeats() (presets are rebuilt when they change).
  * @returns {[import('@companion-module/base').CompanionPresetSection[], import('@companion-module/base').CompanionPresetDefinitions]}
  */
 export function presetDefinitions(self) {
 	const v = (name) => `$(${self.label}:${name})`
-	const seats = self.state.seats.length
-		? self.state.seats.map((s) => s.n)
-		: Array.from({ length: Math.min(8, MAX_SEATS) }, (_, i) => i + 1)
+	const seats = buttonSeats(self.state, self.presetSeats)
+	const note = seatsNote(self)
 	const presets = {}
 	const style = (text, extra = {}) => ({ text, size: 'auto', color: COLOURS.white, bgcolor: COLOURS.night, ...extra })
 	const press = (actionId, options) => [{ down: [{ actionId, options }], up: [] }]
@@ -201,14 +220,13 @@ export function presetDefinitions(self) {
 		{
 			id: 'seats',
 			name: 'Seats',
-			description:
-				'Green while the presenter is on their page, grey when the link is off. Press to switch the link on or off.',
+			description: `Green while the presenter is on their page, grey when the link is off. Press to switch the link on or off. ${note}`,
 			definitions: seats.map((n) => `seat_${n}`).concat('status_connected'),
 		},
 		{
 			id: 'cues',
 			name: 'Cues',
-			description: 'Send a cue to one presenter. Blue while that cue is showing.',
+			description: `Send a cue to one presenter. Blue while that cue is showing. ${note}`,
 			definitions: [
 				...cueGroups,
 				{ id: 'cue-clear', type: 'simple', name: 'Clear', presets: seats.map((n) => `cue_clear_${n}`) },

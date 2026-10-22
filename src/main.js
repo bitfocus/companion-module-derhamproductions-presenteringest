@@ -3,7 +3,7 @@ import { ApiError, cleanHost, DEFAULT_HOST, PresenterIngestApi, validKey } from 
 import { actionDefinitions } from './actions.js'
 import { feedbackDefinitions } from './feedbacks.js'
 import { presetDefinitions } from './presets.js'
-import { emptyState, shapeKey } from './state.js'
+import { emptyState, MAX_SEATS, shapeKey } from './state.js'
 import { variableDefinitions, variableValues } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 
@@ -59,6 +59,19 @@ export default class PresenterIngestInstance extends InstanceBase {
 				default: DEFAULT_HOST,
 			},
 			{
+				type: 'dropdown',
+				id: 'preset_seats',
+				label: 'Preset seats',
+				tooltip:
+					'Which seats get ready-made buttons under Presets. Match my booking shows only the seats on the booking. A number builds buttons for that many seats, connected or not, so you can set up pages offline or before moving to a bigger package.',
+				width: 8,
+				default: 0,
+				choices: [
+					{ id: 0, label: 'Match my booking' },
+					...Array.from({ length: MAX_SEATS }, (_, i) => ({ id: i + 1, label: `${i + 1} seat${i ? 's' : ''}` })),
+				],
+			},
+			{
 				type: 'number',
 				id: 'interval',
 				label: 'Check every (seconds)',
@@ -76,6 +89,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 		const key = String((secrets && secrets.key) || '').trim()
 		this.api = new PresenterIngestApi(this.config.host, key)
 		this.interval = Math.min(10, Math.max(1, Number(this.config.interval) || 1)) * 1000
+		this.presetSeats = Math.min(MAX_SEATS, Math.max(0, Math.floor(Number(this.config.preset_seats) || 0)))
 		if (cleanHost(this.config.host) === null) {
 			this.updateStatus(InstanceStatus.BadConfig, 'The site address must start with https://')
 		} else if (!validKey(key)) {
@@ -162,14 +176,14 @@ export default class PresenterIngestInstance extends InstanceBase {
 			this.shape = shape
 			this.defineAll()
 		}
-		this.setVariableValues(variableValues(this.state))
+		this.setVariableValues(variableValues(this.state, this.presetSeats))
 		this.checkAllFeedbacks()
 	}
 
 	defineAll() {
 		this.setActionDefinitions(actionDefinitions(this))
 		this.setFeedbackDefinitions(feedbackDefinitions(this))
-		this.setVariableDefinitions(variableDefinitions(this.state))
+		this.setVariableDefinitions(variableDefinitions(this.state, this.presetSeats))
 		const [structure, presets] = presetDefinitions(this)
 		this.setPresetDefinitions(structure, presets)
 	}

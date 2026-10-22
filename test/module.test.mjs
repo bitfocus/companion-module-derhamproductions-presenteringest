@@ -4,10 +4,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanHost, validKey, PresenterIngestApi, ApiError } from '../src/api.js'
-import { formatTimer, timerState, seatChoices, emptyState } from '../src/state.js'
+import { formatTimer, timerState, seatChoices, emptyState, buttonSeats } from '../src/state.js'
 import { actionDefinitions } from '../src/actions.js'
 import { feedbackDefinitions } from '../src/feedbacks.js'
-import { presetDefinitions } from '../src/presets.js'
+import { presetDefinitions, seatsNote } from '../src/presets.js'
 import { variableDefinitions, variableValues } from '../src/variables.js'
 
 const KEY = 'pic1_booking01_' + 'a'.repeat(40)
@@ -147,6 +147,38 @@ test('builds actions, feedbacks, variables and presets for the seats', () => {
 		for (const f of p.feedbacks) assert.ok(feedbacks[f.feedbackId], `feedback ${f.feedbackId}`)
 	}
 	assert.match(presets.seat_1.style.text, /\$\(pi:seat_1_name\)/)
+})
+
+test("Preset seats: the booking's seats by default, or a set number even offline", () => {
+	const offline = emptyState()
+	assert.deepEqual(buttonSeats(offline), [1, 2, 3, 4, 5, 6, 7, 8])
+	assert.deepEqual(
+		buttonSeats(offline, 12),
+		Array.from({ length: 12 }, (_, i) => i + 1),
+	)
+	assert.deepEqual(buttonSeats(STATE), [1, 2])
+	assert.deepEqual(buttonSeats(STATE, 4), [1, 2, 3, 4])
+	assert.deepEqual(
+		buttonSeats(STATE, 99),
+		Array.from({ length: 24 }, (_, i) => i + 1),
+	)
+
+	// The presets page says which seats it covers and where to change it
+	assert.match(seatsNote({ state: STATE, presetSeats: 0 }), /Only the 2 seats on this booking/)
+	assert.match(seatsNote({ state: STATE, presetSeats: 0 }), /Preset seats/)
+	assert.match(seatsNote({ state: offline, presetSeats: 0 }), /Not connected yet, so these are for seats 1 to 8/)
+	assert.match(seatsNote({ state: STATE, presetSeats: 4 }), /seats 1 to 4.*Your booking has 2 seats/)
+
+	// Built for 4 seats on a 2-seat booking: buttons and working variables for all 4
+	const self = { state: STATE, label: 'pi', presetSeats: 4, async call() {}, async poll() {} }
+	const [structure, presets] = presetDefinitions(self)
+	assert.ok(presets.seat_4 && presets.cue_live_4 && presets.cue_clear_4)
+	assert.match(structure.find((s) => s.id === 'seats').description, /seats 1 to 4/)
+	const values = variableValues(STATE, 4)
+	assert.equal(values.seat_4_name, 'Seat 4')
+	assert.equal(values.seat_4_online, false)
+	assert.ok(variableDefinitions(STATE, 4).seat_4_cue)
+	assert.ok(actionDefinitions(self).seat_link.options[0].choices.some((c) => c.id === 4))
 })
 
 // ---------------------------------------------------------------- live

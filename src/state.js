@@ -35,10 +35,15 @@ export function seat(state, n) {
 	return state.seats.find((s) => s.n === Number(n)) || null
 }
 
-export function seatChoices(state, withAll = false) {
-	const seats = state.seats.length
-		? state.seats.map((s) => ({ id: s.n, label: `Seat ${s.n}${s.name ? ': ' + s.name : ''}` }))
-		: Array.from({ length: MAX_SEATS }, (_, i) => ({ id: i + 1, label: `Seat ${i + 1}` }))
+export function seatChoices(state, withAll = false, presetSeats = 0) {
+	const booked = state.seats.map((s) => ({ id: s.n, label: `Seat ${s.n}${s.name ? ': ' + s.name : ''}` }))
+	// Before connecting, any seat a package can have; after, the booking's seats plus any preset-only ones
+	const extra = (
+		state.seats.length ? buttonSeats(state, presetSeats) : Array.from({ length: MAX_SEATS }, (_, i) => i + 1)
+	)
+		.filter((n) => !state.seats.some((s) => s.n === n))
+		.map((n) => ({ id: n, label: `Seat ${n}` }))
+	const seats = [...booked, ...extra].sort((a, b) => a.id - b.id)
 	return withAll ? [{ id: 'all', label: 'Every presenter' }, ...seats] : seats
 }
 
@@ -86,6 +91,25 @@ export function timerState(timer) {
 		return timer.overtime ? 'overtime' : 'finished'
 	}
 	return 'running'
+}
+
+/** Seats shown before the first status, when presets match the booking */
+export const OFFLINE_SEATS = 8
+
+/**
+ * The seat numbers that get preset buttons and variables. With Preset seats set
+ * (1-24), that many, connected or not, so pages can be built offline or ahead of
+ * a bigger booking. Otherwise the booking's own seats (8 until it's connected).
+ */
+export function buttonSeats(state, presetSeats = 0) {
+	const fixed = Math.min(MAX_SEATS, Math.max(0, Math.floor(Number(presetSeats) || 0)))
+	if (fixed > 0) {
+		return Array.from({ length: fixed }, (_, i) => i + 1)
+	}
+	if (state.seats.length) {
+		return state.seats.map((s) => s.n)
+	}
+	return Array.from({ length: OFFLINE_SEATS }, (_, i) => i + 1)
 }
 
 /** A short "what does the state look like" key, so definitions are only rebuilt when seats change */
