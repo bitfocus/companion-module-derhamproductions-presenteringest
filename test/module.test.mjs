@@ -458,3 +458,41 @@ test('connections on the old 1-second default move to 3 seconds', async () => {
 	assert.equal(run({ interval: 5 }), null)
 	assert.equal(run(null), null)
 })
+
+test('uses the site\'s lighter status address, only as a path on the same site, and falls back', async () => {
+	const calls = []
+	let fastWorks = true
+	const fake = async (url, opts) => {
+		calls.push({ url, key: opts.headers['X-Presenter-Ingest-Key'], redirect: opts.redirect })
+		if (url.includes('pi-fast.php') && !fastWorks) {
+			return new Response('{"ok":false}', { status: 503 })
+		}
+		return new Response(JSON.stringify({ ok: true, seats: [], fast: '/pi-fast.php?c=1' }), { status: 200 })
+	}
+	const api = new PresenterIngestApi('https://presenteringest.com', KEY, fake)
+	await api.status()
+	await api.status()
+	assert.deepEqual(
+		calls.map((c) => c.url),
+		['https://presenteringest.com/pi-api/companion/v1/status', 'https://presenteringest.com/pi-fast.php?c=1'],
+	)
+	assert.ok(calls.every((c) => c.key === KEY && c.redirect === 'error'))
+	// Fails: straight back to the usual address, and not tried again for a while
+	fastWorks = false
+	calls.length = 0
+	await api.status()
+	await api.status()
+	assert.deepEqual(
+		calls.map((c) => c.url.replace('https://presenteringest.com', '')),
+		['/pi-fast.php?c=1', '/pi-api/companion/v1/status', '/pi-api/companion/v1/status'],
+	)
+	// Never another site, or anything but pi-fast.php
+	for (const fast of ['//evil.example/pi-fast.php?c=1', 'https://evil.example/pi-fast.php?c=1', '/pi-fast.php?c=1&x=1', '/other.php?c=1', '/a/../pi-fast.php?c=1x']) {
+		const other = new PresenterIngestApi('https://presenteringest.com', KEY, async () => new Response(JSON.stringify({ ok: true, seats: [], fast }), { status: 200 }))
+		await other.status()
+		assert.equal(other.fastPath, null, fast)
+	}
+	const sub = new PresenterIngestApi('https://presenteringest.com', KEY, async () => new Response(JSON.stringify({ ok: true, seats: [], fast: '/events/pi-fast.php?c=1' }), { status: 200 }))
+	await sub.status()
+	assert.equal(sub.fastPath, '/events/pi-fast.php?c=1')
+})
