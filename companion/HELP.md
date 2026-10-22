@@ -15,6 +15,7 @@ Each key works for one booking only, until the booking ends. Make a new key or p
 - **Seat: switch link on / off** (on, off or toggle). An open presenter page follows within seconds.
 - **Cue: send to a presenter** (or to every presenter), including a custom message, and **Cue: clear**. Pressing a cue button again clears that cue (untick **Pressing again clears it** to send it every time).
 - **Banner: show to every presenter** (with an optional "back at" time) and **Banner: clear**.
+- **Countdown: set, ready to start** gets a countdown ready without presenters seeing it: adjust it with **add or take away time** or a dial, then start it by pressing the countdown or with **Countdown: start the set time**. It is kept in Companion only, and **Countdown: clear** forgets it.
 - **Countdown: start** (for a number of minutes, or to a time of day, with an optional label and overtime), **pause / resume**, **add or take away time**, **nudge (for a dial)** and **clear**. Nudges from quick turns are added up and sent together, and the countdown in Companion moves straight away.
 - **Refresh now**.
 
@@ -24,18 +25,18 @@ Each key works for one booking only, until the booking ends. Make a new key or p
 - **Seat: link is switched off**.
 - **Seat: has a cue** (any, or a particular one). With **Every presenter**, lit when they all have it.
 - **Banner: showing**.
-- **Countdown: state** (running, paused, overtime, finished, not set) and **running with little time left**.
+- **Countdown: state** (set and ready to start, running, paused, overtime, finished, not set) and **running with little time left**.
 - **Connection: talking to Presenter Ingest**.
 
 ### Variables
 
-`booking_title`, `booking_state`, `presenters_connected`, `seats_on`, `banner`, `timer` (e.g. `4:05`, or `+0:30` in overtime), `timer_seconds`, `timer_label`, `timer_state`, and for each seat `seat_N_name`, `seat_N_online`, `seat_N_enabled` and `seat_N_cue`.
+`booking_title`, `booking_state`, `presenters_connected`, `seats_on`, `banner`, `timer` (e.g. `4:05`, or `+0:30` in overtime), `timer_seconds`, `timer_label`, `timer_state`, `timer_set` (a countdown set but not started), and for each seat `seat_N_name`, `seat_N_online`, `seat_N_enabled` and `seat_N_cue`.
 
 ### Presets
 
 - **Seats**: one button per seat, showing the presenter's name. Green while they're on their page, grey when the link is off. **Tap to switch the link on; hold for a second to switch it off**, so a stray press can't cut a presenter off. (You can change the hold time on the button's long-press group.)
 - **Cues**: Stand by, Next, Live, Wrap up, Time's up, Thanks and Clear for each seat, plus Stand by and Clear for everyone. A cue button lights blue while that cue is showing; press it again to clear it.
-- **Countdown**: the time (press to pause; on a dial such as a Stream Deck + or Loupedeck, turn it for ±15 seconds a click), start 1 to 30 minutes, ±1 minute, pause and clear. Change the seconds per click in the button's rotate actions.
+- **Countdown**: the time (press to pause; on a dial such as a Stream Deck + or Loupedeck, turn it for ±15 seconds a click), start 1 to 30 minutes, ±1 minute, pause and clear. **Set 1 to 30 minutes** gets a countdown ready without starting it: the countdown button turns blue and shows it, ±1 minute or the dial adjusts it, and pressing the countdown (or **Start**) starts it for every presenter. Change the seconds per click in the button's rotate actions.
 - **Banners**: each banner, and clear.
 
 **Which seats get buttons.** By default, only the seats on your booking get Seat and Cue buttons, so a 4-seat booking shows buttons for seats 1 to 4. Before you connect, the presets show seats 1 to 8 as examples.

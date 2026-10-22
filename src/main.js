@@ -3,7 +3,7 @@ import { ApiError, cleanHost, DEFAULT_HOST, PresenterIngestApi, validKey } from 
 import { actionDefinitions } from './actions.js'
 import { feedbackDefinitions } from './feedbacks.js'
 import { presetDefinitions } from './presets.js'
-import { emptyState, MAX_SEATS, seatsFromStatus, shapeKey } from './state.js'
+import { emptyState, MAX_SEATS, MAX_TIMER_SECONDS, seatsFromStatus, shapeKey } from './state.js'
 import { variableDefinitions, variableValues } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 
@@ -142,6 +142,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 				banner: data.banner || null,
 				timer: data.timer || null,
 				presets: data.presets || null,
+				staged: this.state.staged,
 			}
 			// Dial turns not sent yet: keep showing them on top of what the site says
 			if (this.nudgePending && this.state.timer) {
@@ -213,7 +214,15 @@ export default class PresenterIngestInstance extends InstanceBase {
 	 * about 10 a second per booking). Does nothing without a countdown.
 	 */
 	nudgeTimer(seconds) {
-		if (!seconds || !this.state.timer) {
+		if (!seconds) {
+			return
+		}
+		if (!this.state.timer) {
+			// A countdown set but not started is adjusted here in Companion
+			if (this.state.staged) {
+				const total = Math.min(MAX_TIMER_SECONDS, Math.max(0, this.state.staged.seconds + seconds))
+				this.setStaged({ ...this.state.staged, seconds: total })
+			}
 			return
 		}
 		this.nudgePending = (this.nudgePending || 0) + seconds
@@ -230,6 +239,25 @@ export default class PresenterIngestInstance extends InstanceBase {
 				}
 			}, NUDGE_MS)
 		}
+	}
+
+	/** Sets up a countdown in Companion without starting it (null to forget it) */
+	setStaged(staged) {
+		this.state = { ...this.state, staged }
+		this.setVariableValues(variableValues(this.state, this.presetSeats))
+		this.checkAllFeedbacks()
+	}
+
+	/** Starts the set countdown on every presenter page; it stays set if the site refuses it */
+	async startStaged() {
+		const s = this.state.staged
+		if (!s || s.seconds <= 0) {
+			return
+		}
+		await this.call('Countdown', async (api) => {
+			await api.timer({ mode: 'minutes', minutes: s.seconds / 60, label: s.label, overtime: s.overtime })
+			this.state = { ...this.state, staged: null }
+		})
 	}
 
 	/** Runs an action's API call, logs a refusal, and refreshes straight away */

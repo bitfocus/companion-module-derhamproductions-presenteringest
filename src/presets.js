@@ -144,12 +144,17 @@ export function presetDefinitions(self) {
 			options: { state: 'finished' },
 			style: { bgcolor: COLOURS.red, color: COLOURS.white },
 		},
+		{
+			feedbackId: 'timer_state',
+			options: { state: 'set' },
+			style: { bgcolor: COLOURS.blue, color: COLOURS.white },
+		},
 	]
-	// The live countdown. On a dial (Stream Deck +, Loupedeck), turning adds or takes away time and
-	// pressing pauses / resumes
+	// The live countdown, or one set and ready to start (blue). On a dial (Stream Deck +, Loupedeck),
+	// turning adds or takes away time and pressing starts / pauses / resumes
 	presets.timer_display = {
 		type: 'simple',
-		name: 'Countdown: show (press to pause / resume; turn a dial for ±15 s)',
+		name: 'Countdown: show (press to start / pause / resume; turn a dial for ±15 s)',
 		keywords: ['timer', 'rotary', 'dial', 'knob', 'encoder'],
 		style: style(v('timer'), { size: '24' }),
 		previewStyle: preview('4:05', { bgcolor: COLOURS.green }),
@@ -171,6 +176,28 @@ export function presetDefinitions(self) {
 			steps: press('timer_start', { mode: 'minutes', minutes, until: '', label: '', overtime: false }),
 			feedbacks: [],
 		}
+		// Set it without starting: presenters see nothing until it's started
+		presets[`timer_set_${minutes}`] = {
+			type: 'simple',
+			name: `Countdown: set ${minutes} min, ready to start`,
+			style: style(`Set\\n${minutes} min`, { size: '14' }),
+			steps: press('timer_set', { minutes, label: '', overtime: false }),
+			feedbacks: [],
+		}
+	}
+	presets.timer_start_set = {
+		type: 'simple',
+		name: 'Countdown: start the set time',
+		style: style(`Start\\n${v('timer_set')}`, { size: '14' }),
+		previewStyle: preview('Start\\n5:00'),
+		steps: press('timer_start_set', {}),
+		feedbacks: [
+			{
+				feedbackId: 'timer_state',
+				options: { state: 'set' },
+				style: { bgcolor: COLOURS.blue, color: COLOURS.white },
+			},
+		],
 	}
 	presets.timer_plus = {
 		type: 'simple',
@@ -280,6 +307,8 @@ export function presetDefinitions(self) {
 			definitions: [
 				'timer_display',
 				...[1, 2, 5, 10, 15, 30].map((m) => `timer_start_${m}`),
+				...[1, 2, 5, 10, 15, 30].map((m) => `timer_set_${m}`),
+				'timer_start_set',
 				'timer_plus',
 				'timer_minus',
 				'timer_pause',

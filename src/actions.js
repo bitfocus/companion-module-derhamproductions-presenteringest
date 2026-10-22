@@ -1,4 +1,4 @@
-import { bannerChoices, cueChoices, hasCue, seatChoices } from './state.js'
+import { bannerChoices, cueChoices, hasCue, MAX_TIMER_SECONDS, seatChoices } from './state.js'
 
 /**
  * Every action calls the API, then asks for a fresh status so buttons update at once.
@@ -155,15 +155,46 @@ export function actionDefinitions(self) {
 				{ id: 'overtime', type: 'checkbox', label: 'Count up in overtime when it runs out', default: false },
 			],
 			callback: async ({ options }) =>
-				self.call('Countdown', (api) =>
-					api.timer({
+				self.call('Countdown', async (api) => {
+					await api.timer({
 						mode: options.mode === 'until' ? 'until' : 'minutes',
 						minutes: Number(options.minutes) || 0,
 						until: String(options.until || ''),
 						label: String(options.label || ''),
 						overtime: !!options.overtime,
-					}),
-				),
+					})
+					self.state = { ...self.state, staged: null }
+				}),
+		},
+
+		timer_set: {
+			name: 'Countdown: set, ready to start',
+			description:
+				'Gets a countdown ready without presenters seeing it. Adjust it (add or take away time, or turn a dial), then start it: press the countdown, or use Countdown: start the set time. It is kept in Companion only.',
+			options: [
+				{ id: 'minutes', type: 'number', label: 'Minutes', default: 5, min: 0.25, max: 600, step: 0.25 },
+				{
+					id: 'label',
+					type: 'textinput',
+					label: 'Label (optional, e.g. Session starts in)',
+					default: '',
+					useVariables: true,
+				},
+				{ id: 'overtime', type: 'checkbox', label: 'Count up in overtime when it runs out', default: false },
+			],
+			callback: async ({ options }) =>
+				self.setStaged({
+					seconds: Math.min(MAX_TIMER_SECONDS, Math.max(0, Math.round((Number(options.minutes) || 0) * 60))),
+					label: String(options.label || ''),
+					overtime: !!options.overtime,
+				}),
+		},
+
+		timer_start_set: {
+			name: 'Countdown: start the set time',
+			description: 'Starts the countdown set with Countdown: set, ready to start. Does nothing when none is set.',
+			options: [],
+			callback: async () => self.startStaged(),
 		},
 
 		timer_pause: {
@@ -181,7 +212,13 @@ export function actionDefinitions(self) {
 					default: 'toggle',
 				},
 			],
-			callback: async ({ options }) => self.call('Countdown', (api) => api.timer({ mode: String(options.mode) })),
+			callback: async ({ options }) => {
+				// Nothing running but a countdown set: toggle / resume starts it
+				if (!self.state.timer && self.state.staged && options.mode !== 'pause') {
+					return self.startStaged()
+				}
+				return self.call('Countdown', (api) => api.timer({ mode: String(options.mode) }))
+			},
 		},
 
 		timer_adjust: {
@@ -198,8 +235,12 @@ export function actionDefinitions(self) {
 					asInteger: true,
 				},
 			],
-			callback: async ({ options }) =>
-				self.call('Countdown', (api) => api.timer({ mode: 'adjust', seconds: Number(options.seconds) || 0 })),
+			callback: async ({ options }) => {
+				if (!self.state.timer && self.state.staged) {
+					return self.nudgeTimer(Number(options.seconds) || 0)
+				}
+				return self.call('Countdown', (api) => api.timer({ mode: 'adjust', seconds: Number(options.seconds) || 0 }))
+			},
 		},
 
 		timer_nudge: {
@@ -223,8 +264,12 @@ export function actionDefinitions(self) {
 
 		timer_clear: {
 			name: 'Countdown: clear',
+			description: 'Takes the countdown off presenter pages, and forgets one set in Companion.',
 			options: [],
-			callback: async () => self.call('Countdown', (api) => api.timer({ mode: 'clear' })),
+			callback: async () => {
+				self.setStaged(null)
+				return self.call('Countdown', (api) => api.timer({ mode: 'clear' }))
+			},
 		},
 
 		refresh: {

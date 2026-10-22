@@ -24,8 +24,13 @@ const DEFAULT_BANNERS = {
 export const MAX_SEATS = 24
 
 export function emptyState() {
-	return { connected: false, booking: null, seats: [], banner: null, timer: null, presets: null }
+	// staged: a countdown set up in Companion but not started ({ seconds, label, overtime }), which
+	// presenters don't see until it's started
+	return { connected: false, booking: null, seats: [], banner: null, timer: null, presets: null, staged: null }
 }
+
+/** The longest countdown the site takes (600 minutes) */
+export const MAX_TIMER_SECONDS = 36000
 
 /** The seats from a status reply; with names off, the names are dropped there and then, never kept */
 export function seatsFromStatus(seats, showNames = true) {
@@ -101,10 +106,10 @@ export function formatTimer(timer) {
 	return left < 0 ? `+${clock}` : clock
 }
 
-/** stopped | running | paused | overtime | finished */
-export function timerState(timer) {
+/** stopped | set (in Companion, not started) | running | paused | overtime | finished */
+export function timerState(timer, staged = null) {
 	if (!timer) {
-		return 'stopped'
+		return staged ? 'set' : 'stopped'
 	}
 	if (timer.paused) {
 		return 'paused'

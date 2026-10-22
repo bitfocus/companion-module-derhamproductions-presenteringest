@@ -80,6 +80,7 @@ export function feedbackDefinitions(self) {
 					type: 'dropdown',
 					label: 'When the countdown is',
 					choices: [
+						{ id: 'set', label: 'Set in Companion, not started' },
 						{ id: 'running', label: 'Running' },
 						{ id: 'paused', label: 'Paused' },
 						{ id: 'overtime', label: 'In overtime' },
@@ -89,7 +90,7 @@ export function feedbackDefinitions(self) {
 					default: 'running',
 				},
 			],
-			callback: ({ options }) => timerState(self.state.timer) === options.state,
+			callback: ({ options }) => timerState(self.state.timer, self.state.staged) === options.state,
 		},
 
 		timer_low: {

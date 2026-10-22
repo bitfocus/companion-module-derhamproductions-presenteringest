@@ -330,3 +330,56 @@ test('a dial on the countdown: turns show at once and are sent together', async 
 	assert.equal(presets.timer_display.previewStyle.text, '4:05')
 	assert.ok(!presets.seat_1.previewStyle.text.includes('$('))
 })
+
+test('a countdown set in Companion: adjusted, then started; presenters see nothing before', async () => {
+	const { default: Instance } = await import('../src/main.js')
+	const sent = []
+	let refuse = false
+	const self = Object.create(Instance.prototype)
+	Object.assign(self, {
+		presetSeats: 0,
+		state: { ...emptyState(), connected: true },
+		shown: {},
+		setVariableValues(values) {
+			this.shown = values
+		},
+		checkAllFeedbacks() {},
+		async call(_what, fn) {
+			try {
+				await fn({
+					timer: async (body) => {
+						if (refuse) throw new Error('refused')
+						sent.push(body)
+					},
+				})
+			} catch {
+				// logged by the real call()
+			}
+		},
+	})
+	const actions = () => actionDefinitions(self)
+	await actions().timer_set.callback({ options: { minutes: 5, label: 'Session starts in', overtime: true } })
+	assert.equal(self.shown.timer, '5:00')
+	assert.equal(self.shown.timer_state, 'set')
+	await actions().timer_adjust.callback({ options: { seconds: 60 } })
+	self.nudgeTimer(-15)
+	self.nudgeTimer(-15)
+	assert.equal(self.shown.timer_set, '5:30')
+	assert.deepEqual(sent, [], 'nothing sent while it is only set')
+	// Pausing does nothing to a set countdown; a refused start keeps it set
+	await actions().timer_pause.callback({ options: { mode: 'pause' } })
+	assert.deepEqual(sent, [{ mode: 'pause' }])
+	sent.length = 0
+	refuse = true
+	await actions().timer_pause.callback({ options: { mode: 'toggle' } })
+	assert.equal(self.state.staged.seconds, 330)
+	refuse = false
+	await actions().timer_pause.callback({ options: { mode: 'toggle' } })
+	assert.deepEqual(sent, [{ mode: 'minutes', minutes: 5.5, label: 'Session starts in', overtime: true }])
+	assert.equal(self.state.staged, null)
+	// Clear forgets a set one too
+	await actions().timer_set.callback({ options: { minutes: 2, label: '', overtime: false } })
+	await actions().timer_clear.callback({ options: {} })
+	assert.equal(self.state.staged, null)
+	assert.equal(timerState(null, null), 'stopped')
+})

@@ -10,7 +10,8 @@ export function variableDefinitions(state, presetSeats = 0) {
 		timer: { name: 'Countdown, e.g. 4:05 (or +0:30 in overtime)' },
 		timer_seconds: { name: 'Countdown in seconds (negative in overtime)' },
 		timer_label: { name: 'Countdown label' },
-		timer_state: { name: 'Countdown state: stopped, running, paused, overtime or finished' },
+		timer_state: { name: 'Countdown state: stopped, set (not started), running, paused, overtime or finished' },
+		timer_set: { name: 'Countdown set in Companion, not started yet (blank when none)' },
 	}
 	for (const n of seatNumbers(state, presetSeats)) {
 		defs[`seat_${n}_name`] = { name: `Seat ${n}: presenter name` }
@@ -22,16 +23,19 @@ export function variableDefinitions(state, presetSeats = 0) {
 }
 
 export function variableValues(state, presetSeats = 0) {
+	const staged = state.staged || null
 	const values = {
 		booking_title: state.booking ? state.booking.title : '',
 		booking_state: state.booking ? state.booking.state : '',
 		presenters_connected: state.seats.filter((s) => s.online).length,
 		seats_on: state.seats.filter((s) => s.enabled).length,
 		banner: state.banner ? state.banner.text : '',
-		timer: formatTimer(state.timer),
-		timer_seconds: state.timer ? state.timer.remaining : 0,
-		timer_label: state.timer ? state.timer.label : '',
-		timer_state: timerState(state.timer),
+		// With no countdown running, a set one shows instead, so the countdown button shows what Start will send
+		timer: formatTimer(state.timer || (staged && { remaining: staged.seconds })),
+		timer_seconds: state.timer ? state.timer.remaining : staged ? staged.seconds : 0,
+		timer_label: state.timer ? state.timer.label : staged ? staged.label : '',
+		timer_state: timerState(state.timer, staged),
+		timer_set: staged ? formatTimer({ remaining: staged.seconds }) : '',
 	}
 	for (const n of seatNumbers(state, presetSeats)) {
 		const s = state.seats.find((x) => x.n === n)
