@@ -241,7 +241,7 @@ export function presetDefinitions(self) {
 			type: 'simple',
 			name: `Banner: ${b.label}`,
 			style: style(b.label, { size: '14' }),
-			steps: press('banner_show', { banner: b.id, text: '', until: '' }),
+			steps: press('banner_show', { banner: b.id, text: '', until: '', again: true }),
 			feedbacks: [
 				{
 					feedbackId: 'banner_shown',

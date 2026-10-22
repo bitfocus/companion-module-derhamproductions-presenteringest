@@ -1,6 +1,6 @@
 {
 	"name": "derhamproductions-presenteringest",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"description": "Bitfocus Companion module for Presenter Ingest: run a booking's presenter seats, banners, countdowns and cues from Companion",
 	"type": "module",
 	"main": "src/main.js",

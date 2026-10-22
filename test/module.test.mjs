@@ -383,3 +383,29 @@ test('a countdown set in Companion: adjusted, then started; presenters see nothi
 	assert.equal(self.state.staged, null)
 	assert.equal(timerState(null, null), 'stopped')
 })
+
+test('a banner button pressed again clears the banner', async () => {
+	const sent = []
+	const self = {
+		presetSeats: 0,
+		state: { ...emptyState(), connected: true, banner: { preset: 'break', text: 'Comfort break', until: '14:30' } },
+		call: async (_what, fn) => fn({ setBanner: async (...args) => sent.push(args) }),
+	}
+	const show = actionDefinitions(self).banner_show.callback
+	await show({ options: { banner: 'break', text: '', until: '' } })
+	await show({ options: { banner: 'lunch', text: '', until: '' } })
+	await show({ options: { banner: 'break', text: '', until: '', again: false } })
+	self.state.banner = { preset: 'custom', text: 'Hello', until: '' }
+	await show({ options: { banner: 'custom', text: 'Hello', until: '' } })
+	await show({ options: { banner: 'custom', text: 'Bye', until: '' } })
+	self.state.banner = null
+	await show({ options: { banner: 'break', text: '', until: '15:00' } })
+	assert.deepEqual(sent, [
+		['none'],
+		['lunch', '', ''],
+		['break', '', ''],
+		['none'],
+		['custom', 'Bye', ''],
+		['break', '', '15:00'],
+	])
+})

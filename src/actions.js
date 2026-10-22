@@ -100,11 +100,29 @@ export function actionDefinitions(self) {
 					isVisibleExpression: "$(options:banner) == 'custom'",
 				},
 				{ id: 'until', type: 'textinput', label: 'Back at (optional, e.g. 14:30)', default: '', useVariables: true },
+				{
+					id: 'again',
+					type: 'checkbox',
+					label: 'Pressing again clears it',
+					tooltip: 'When this banner is already showing, the press clears it instead',
+					default: true,
+				},
 			],
-			callback: async ({ options }) =>
-				self.call('Banner', (api) =>
-					api.setBanner(String(options.banner), String(options.text || ''), String(options.until || '')),
-				),
+			callback: async ({ options }) => {
+				const banner = String(options.banner)
+				const text = String(options.text || '')
+				const shown = self.state.banner
+				// Buttons made before this option existed toggle too; a custom banner only matches the same text
+				if (
+					options.again !== false &&
+					shown &&
+					shown.preset === banner &&
+					(banner !== 'custom' || shown.text === text)
+				) {
+					return self.call('Banner', (api) => api.setBanner('none'))
+				}
+				return self.call('Banner', (api) => api.setBanner(banner, text, String(options.until || '')))
+			},
 		},
 
 		banner_clear: {
