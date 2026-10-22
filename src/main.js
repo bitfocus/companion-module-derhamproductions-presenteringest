@@ -3,7 +3,7 @@ import { ApiError, cleanHost, DEFAULT_HOST, PresenterIngestApi, validKey } from 
 import { actionDefinitions } from './actions.js'
 import { feedbackDefinitions } from './feedbacks.js'
 import { presetDefinitions } from './presets.js'
-import { emptyState, MAX_SEATS, shapeKey } from './state.js'
+import { emptyState, MAX_SEATS, seatsFromStatus, shapeKey } from './state.js'
 import { variableDefinitions, variableValues } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 
@@ -72,6 +72,15 @@ export default class PresenterIngestInstance extends InstanceBase {
 				],
 			},
 			{
+				type: 'checkbox',
+				id: 'show_names',
+				label: 'Show presenter names',
+				tooltip:
+					'On: buttons, variables and seat lists show each presenter’s name from the booking. Off: just Seat 1, Seat 2 and so on, for a Companion screen other people can see. Names are then not kept in Companion at all.',
+				width: 4,
+				default: true,
+			},
+			{
 				type: 'number',
 				id: 'interval',
 				label: 'Check every (seconds)',
@@ -89,6 +98,8 @@ export default class PresenterIngestInstance extends InstanceBase {
 		const key = String((secrets && secrets.key) || '').trim()
 		this.api = new PresenterIngestApi(this.config.host, key)
 		this.interval = Math.min(10, Math.max(1, Number(this.config.interval) || 1)) * 1000
+		// Missing in configs saved before 0.3.0: names on, as before
+		this.showNames = this.config.show_names !== false
 		this.presetSeats = Math.min(MAX_SEATS, Math.max(0, Math.floor(Number(this.config.preset_seats) || 0)))
 		if (cleanHost(this.config.host) === null) {
 			this.updateStatus(InstanceStatus.BadConfig, 'The site address must start with https://')
@@ -123,7 +134,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 			this.state = {
 				connected: true,
 				booking: data.booking || null,
-				seats: Array.isArray(data.seats) ? data.seats : [],
+				seats: seatsFromStatus(data.seats, this.showNames),
 				banner: data.banner || null,
 				timer: data.timer || null,
 				presets: data.presets || null,

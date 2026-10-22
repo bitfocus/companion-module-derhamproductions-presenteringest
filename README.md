@@ -15,7 +15,7 @@ The module polls `GET /pi-api/companion/v1/status` and posts changes to `seat`, 
 - with redirects refused, so the key can't be passed on to another host
 - never in log messages
 
-Companion stores the key as a secret (`secret-text`), separately from the connection's config. The status holds only what Live control shows: seat numbers and names, on/off, whether each presenter's page is open, their cue, the banner and the countdown. It holds no presenter links, emails or studio connection details.
+Companion stores the key as a secret (`secret-text`), separately from the connection's config. The status holds only what Live control shows: seat numbers and names, on/off, whether each presenter's page is open, their cue, the banner and the countdown. It holds no presenter links, emails or studio connection details. With **Show presenter names** off, the module drops the names as each status arrives, so they never reach variables, buttons or Companion's exports.
 
 ## Development
 

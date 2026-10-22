@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanHost, validKey, PresenterIngestApi, ApiError } from '../src/api.js'
-import { formatTimer, timerState, seatChoices, emptyState, buttonSeats } from '../src/state.js'
+import { formatTimer, timerState, seatChoices, emptyState, buttonSeats, seatsFromStatus } from '../src/state.js'
 import { actionDefinitions } from '../src/actions.js'
 import { feedbackDefinitions } from '../src/feedbacks.js'
 import { presetDefinitions, seatsNote } from '../src/presets.js'
@@ -147,6 +147,22 @@ test('builds actions, feedbacks, variables and presets for the seats', () => {
 		for (const f of p.feedbacks) assert.ok(feedbacks[f.feedbackId], `feedback ${f.feedbackId}`)
 	}
 	assert.match(presets.seat_1.style.text, /\$\(pi:seat_1_name\)/)
+})
+
+test('Show presenter names off: just seat numbers everywhere', () => {
+	const status = [
+		{ n: 1, name: 'Jane Example', enabled: true, online: true, cue: null },
+		{ n: 2, name: 'Sam Sample', enabled: false, online: false, cue: null },
+	]
+	assert.equal(seatsFromStatus(status)[0].name, 'Jane Example')
+	assert.deepEqual(seatsFromStatus(undefined), [])
+	const state = { ...emptyState(), connected: true, seats: seatsFromStatus(status, false) }
+	assert.equal(status[0].name, 'Jane Example', 'the reply itself is left alone')
+	const text = JSON.stringify([state, seatChoices(state, true), variableValues(state)])
+	assert.ok(!text.includes('Jane') && !text.includes('Sam'))
+	assert.equal(variableValues(state).seat_1_name, 'Seat 1')
+	assert.equal(seatChoices(state)[0].label, 'Seat 1')
+	assert.equal(state.seats[0].online, true)
 })
 
 test("Preset seats: the booking's seats by default, or a set number even offline", () => {

@@ -27,6 +27,14 @@ export function emptyState() {
 	return { connected: false, booking: null, seats: [], banner: null, timer: null, presets: null }
 }
 
+/** The seats from a status reply; with names off, the names are dropped there and then, never kept */
+export function seatsFromStatus(seats, showNames = true) {
+	if (!Array.isArray(seats)) {
+		return []
+	}
+	return showNames ? seats : seats.map((s) => ({ ...s, name: '' }))
+}
+
 export function seatCount(state) {
 	return state.seats.length
 }

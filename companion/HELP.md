@@ -42,6 +42,8 @@ Each key works for one booking only, until the booking ends. Make a new key or p
 
 To build buttons for a set number of seats, choose it under **Preset seats** in this connection's settings (1 to 24). The buttons are there whether or not you're connected, so you can build your pages offline, or before moving to a bigger package. Buttons for seats your booking doesn't have stay dark until it does.
 
+**Presenter names.** Buttons, variables and seat lists show each presenter's name from the booking. If other people can see your Companion screen or Stream Deck, untick **Show presenter names** in this connection's settings: everything then just says Seat 1, Seat 2 and so on, and the names aren't kept in Companion.
+
 ### Notes
 
 - The module checks the booking every second (change it under **Check every**). Presenter Ingest allows about 10 requests a second per booking, plenty for polling and button presses.
