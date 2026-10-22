@@ -1,5 +1,5 @@
 import { combineRgb } from '@companion-module/base'
-import { bannerChoices, cueChoices, seat, seatChoices, timerState } from './state.js'
+import { bannerChoices, cueChoices, hasCue, seat, seatChoices, timerState } from './state.js'
 
 export const COLOURS = {
 	black: combineRgb(0, 0, 0),
@@ -53,11 +53,12 @@ export function feedbackDefinitions(self) {
 			type: 'boolean',
 			name: 'Seat: has a cue',
 			defaultStyle: { bgcolor: COLOURS.blue, color: COLOURS.white },
-			options: [seatOption, { id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'any' }],
-			callback: ({ options }) => {
-				const s = seat(self.state, options.seat)
-				return !!(s && s.cue && (options.cue === 'any' || s.cue.preset === options.cue))
-			},
+			description: 'With Every presenter, lit when they all have it',
+			options: [
+				{ ...seatOption, choices: seatChoices(self.state, true, self.presetSeats) },
+				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'any' },
+			],
+			callback: ({ options }) => hasCue(self.state, options.seat === 'all' ? 'all' : Number(options.seat), String(options.cue)),
 		},
 
 		banner_shown: {

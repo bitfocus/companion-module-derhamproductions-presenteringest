@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanHost, validKey, PresenterIngestApi, ApiError } from '../src/api.js'
-import { formatTimer, timerState, seatChoices, emptyState, buttonSeats, seatsFromStatus } from '../src/state.js'
+import { formatTimer, timerState, seatChoices, emptyState, buttonSeats, seatsFromStatus, hasCue } from '../src/state.js'
 import { actionDefinitions } from '../src/actions.js'
 import { feedbackDefinitions } from '../src/feedbacks.js'
 import { presetDefinitions, seatsNote } from '../src/presets.js'
@@ -147,6 +147,38 @@ test('builds actions, feedbacks, variables and presets for the seats', () => {
 		for (const f of p.feedbacks) assert.ok(feedbacks[f.feedbackId], `feedback ${f.feedbackId}`)
 	}
 	assert.match(presets.seat_1.style.text, /\$\(pi:seat_1_name\)/)
+})
+
+test('a cue button pressed again clears the cue', async () => {
+	const standby = { preset: 'standby', text: 'Stand by' }
+	const sent = []
+	const self = {
+		presetSeats: 0,
+		state: { ...emptyState(), connected: true, seats: [{ n: 1, cue: standby }, { n: 2, cue: null }] },
+		call: async (_what, fn) => fn({ setCue: async (...args) => sent.push(args) }),
+	}
+	const send = actionDefinitions(self).cue_send.callback
+	await send({ options: { seat: 1, cue: 'standby', text: '' } })
+	await send({ options: { seat: 2, cue: 'standby', text: '' } })
+	await send({ options: { seat: 1, cue: 'next', text: '' } })
+	await send({ options: { seat: 1, cue: 'standby', text: '', again: false } })
+	await send({ options: { seat: 'all', cue: 'standby', text: '' } })
+	assert.deepEqual(sent, [
+		[1, 'none'],
+		[2, 'standby', ''],
+		[1, 'next', ''],
+		[1, 'standby', ''],
+		['all', 'standby', ''],
+	])
+	self.state.seats[1].cue = standby
+	assert.ok(hasCue(self.state, 'all', 'standby'))
+	await send({ options: { seat: 'all', cue: 'standby', text: '' } })
+	assert.deepEqual(sent.at(-1), ['all', 'none'])
+	const custom = { ...emptyState(), seats: [{ n: 1, cue: { preset: 'custom', text: 'Hello' } }] }
+	assert.ok(hasCue(custom, 1, 'custom', 'Hello'))
+	assert.ok(!hasCue(custom, 1, 'custom', 'Bye'))
+	assert.ok(hasCue(custom, 1, 'any'))
+	assert.ok(!hasCue(custom, 2, 'any'))
 })
 
 test('Show presenter names off: just seat numbers everywhere', () => {

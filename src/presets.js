@@ -60,7 +60,7 @@ export function presetDefinitions(self) {
 				type: 'simple',
 				name: `Seat ${n}: ${word}`,
 				style: style(`${word}\\n${v(`seat_${n}_name`)}`, { size: '14' }),
-				steps: press('cue_send', { seat: n, cue, text: '' }),
+				steps: press('cue_send', { seat: n, cue, text: '', again: true }),
 				feedbacks: [
 					{ feedbackId: 'seat_cue', options: { seat: n, cue }, style: { bgcolor: COLOURS.blue, color: COLOURS.white } },
 				],
@@ -84,8 +84,14 @@ export function presetDefinitions(self) {
 		type: 'simple',
 		name: 'Everyone: stand by',
 		style: style('Stand by\\nEVERYONE', { size: '14' }),
-		steps: press('cue_send', { seat: 'all', cue: 'standby', text: '' }),
-		feedbacks: [],
+		steps: press('cue_send', { seat: 'all', cue: 'standby', text: '', again: true }),
+		feedbacks: [
+			{
+				feedbackId: 'seat_cue',
+				options: { seat: 'all', cue: 'standby' },
+				style: { bgcolor: COLOURS.blue, color: COLOURS.white },
+			},
+		],
 	}
 	presets.cue_all_clear = {
 		type: 'simple',

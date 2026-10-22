@@ -1,4 +1,4 @@
-import { bannerChoices, cueChoices, seatChoices } from './state.js'
+import { bannerChoices, cueChoices, hasCue, seatChoices } from './state.js'
 
 /**
  * Every action calls the API, then asks for a fresh status so buttons update at once.
@@ -55,9 +55,24 @@ export function actionDefinitions(self) {
 					useVariables: true,
 					isVisibleExpression: "$(options:cue) == 'custom'",
 				},
+				{
+					id: 'again',
+					type: 'checkbox',
+					label: 'Pressing again clears it',
+					tooltip: 'When the seat (or every seat) already has this cue, the press clears it instead',
+					default: true,
+				},
 			],
-			callback: async ({ options }) =>
-				self.call('Cue', (api) => api.setCue(cueSeat(options.seat), String(options.cue), String(options.text || ''))),
+			callback: async ({ options }) => {
+				const n = cueSeat(options.seat)
+				const cue = String(options.cue)
+				const text = String(options.text || '')
+				// Buttons made before this option existed toggle too
+				if (options.again !== false && hasCue(self.state, n, cue, text)) {
+					return self.call('Cue', (api) => api.setCue(n, 'none'))
+				}
+				return self.call('Cue', (api) => api.setCue(n, cue, text))
+			},
 		},
 
 		cue_clear: {

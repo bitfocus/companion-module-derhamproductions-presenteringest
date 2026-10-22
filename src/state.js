@@ -43,6 +43,20 @@ export function seat(state, n) {
 	return state.seats.find((s) => s.n === Number(n)) || null
 }
 
+/**
+ * Whether a seat (or, for "all", every seat) has this cue right now. "any" matches any cue;
+ * a custom message only matches the same text.
+ */
+export function hasCue(state, n, cue, text = '') {
+	const seats = n === 'all' ? state.seats : state.seats.filter((s) => s.n === Number(n))
+	return (
+		seats.length > 0 &&
+		seats.every(
+			(s) => s.cue && (cue === 'any' || (s.cue.preset === cue && (cue !== 'custom' || s.cue.text === text))),
+		)
+	)
+}
+
 export function seatChoices(state, withAll = false, presetSeats = 0) {
 	const booked = state.seats.map((s) => ({ id: s.n, label: `Seat ${s.n}${s.name ? ': ' + s.name : ''}` }))
 	// Before connecting, any seat a package can have; after, the booking's seats plus any preset-only ones
