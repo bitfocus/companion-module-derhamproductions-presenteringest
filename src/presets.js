@@ -42,6 +42,12 @@ export function presetDefinitions(self) {
 	const presets = {}
 	const style = (text, extra = {}) => ({ text, size: 'auto', color: COLOURS.white, bgcolor: COLOURS.night, ...extra })
 	const press = (actionId, options) => [{ down: [{ actionId, options }], up: [] }]
+	// The presets list draws buttons without their variables, so variable buttons get a preview
+	const preview = (text, extra = {}) => ({ text, ...extra })
+	const nameOf = (n) => {
+		const s = self.state.seats.find((x) => x.n === n)
+		return (s && s.name) || `Seat ${n}`
+	}
 
 	// Seats: name, green while they're on their page, grey when switched off. A tap only ever switches the
 	// link on; switching it off takes a hold, so a stray press can't cut a presenter off
@@ -51,6 +57,7 @@ export function presetDefinitions(self) {
 			type: 'simple',
 			name: `Seat ${n}: on their page / tap for on, hold for off`,
 			style: style(`${n}\\n${v(`seat_${n}_name`)}`),
+			previewStyle: preview(`${n}\\n${nameOf(n)}`),
 			steps: [
 				{
 					down: [],
@@ -71,6 +78,7 @@ export function presetDefinitions(self) {
 				type: 'simple',
 				name: `Seat ${n}: ${word}`,
 				style: style(`${word}\\n${v(`seat_${n}_name`)}`, { size: '14' }),
+				previewStyle: preview(`${word}\\n${nameOf(n)}`),
 				steps: press('cue_send', { seat: n, cue, text: '', again: true }),
 				feedbacks: [
 					{ feedbackId: 'seat_cue', options: { seat: n, cue }, style: { bgcolor: COLOURS.blue, color: COLOURS.white } },
@@ -81,6 +89,7 @@ export function presetDefinitions(self) {
 			type: 'simple',
 			name: `Seat ${n}: clear cue`,
 			style: style(`Clear\\n${v(`seat_${n}_name`)}`, { size: '14' }),
+			previewStyle: preview(`Clear\\n${nameOf(n)}`),
 			steps: press('cue_clear', { seat: n }),
 			feedbacks: [
 				{
@@ -136,11 +145,22 @@ export function presetDefinitions(self) {
 			style: { bgcolor: COLOURS.red, color: COLOURS.white },
 		},
 	]
+	// The live countdown. On a dial (Stream Deck +, Loupedeck), turning adds or takes away time and
+	// pressing pauses / resumes
 	presets.timer_display = {
 		type: 'simple',
-		name: 'Countdown: show (press to pause / resume)',
+		name: 'Countdown: show (press to pause / resume; turn a dial for ±15 s)',
+		keywords: ['timer', 'rotary', 'dial', 'knob', 'encoder'],
 		style: style(v('timer'), { size: '24' }),
-		steps: press('timer_pause', { mode: 'toggle' }),
+		previewStyle: preview('4:05', { bgcolor: COLOURS.green }),
+		steps: [
+			{
+				down: [{ actionId: 'timer_pause', options: { mode: 'toggle' } }],
+				up: [],
+				rotate_left: [{ actionId: 'timer_nudge', options: { seconds: -15 } }],
+				rotate_right: [{ actionId: 'timer_nudge', options: { seconds: 15 } }],
+			},
+		],
 		feedbacks: timerFeedbacks,
 	}
 	for (const minutes of [1, 2, 5, 10, 15, 30]) {
@@ -223,6 +243,9 @@ export function presetDefinitions(self) {
 		type: 'simple',
 		name: 'On their page now',
 		style: style(`${v('presenters_connected')}/${v('seats_on')}\\non page`, { size: '14', bgcolor: COLOURS.red }),
+		previewStyle: preview(
+			`${self.state.seats.filter((s) => s.online).length}/${self.state.seats.filter((s) => s.enabled).length}\\non page`,
+		),
 		steps: press('refresh', {}),
 		feedbacks: [{ feedbackId: 'connected', options: {}, style: { bgcolor: COLOURS.night, color: COLOURS.white } }],
 	}

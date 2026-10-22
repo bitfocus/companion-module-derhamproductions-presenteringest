@@ -202,6 +202,25 @@ export function actionDefinitions(self) {
 				self.call('Countdown', (api) => api.timer({ mode: 'adjust', seconds: Number(options.seconds) || 0 })),
 		},
 
+		timer_nudge: {
+			name: 'Countdown: nudge (for a dial)',
+			description:
+				'Adds or takes away time, for rotate left / right on a dial. Quick turns are added up and sent together, and the countdown here moves straight away.',
+			options: [
+				{
+					id: 'seconds',
+					type: 'number',
+					label: 'Seconds per click (negative to take away)',
+					default: 15,
+					min: -600,
+					max: 600,
+					step: 1,
+					asInteger: true,
+				},
+			],
+			callback: async ({ options }) => self.nudgeTimer(Number(options.seconds) || 0),
+		},
+
 		timer_clear: {
 			name: 'Countdown: clear',
 			options: [],

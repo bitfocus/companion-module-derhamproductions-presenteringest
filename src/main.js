@@ -9,6 +9,9 @@ import { UpgradeScripts } from './upgrades.js'
 
 export { UpgradeScripts }
 
+/** Dial turns are added up and sent at most this often */
+const NUDGE_MS = 400
+
 export default class PresenterIngestInstance extends InstanceBase {
 	async init(config, _isFirstInit, secrets) {
 		this.state = emptyState()
@@ -22,6 +25,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 	async destroy() {
 		this.stopped = true
 		clearTimeout(this.timer)
+		clearTimeout(this.nudgeTimeout)
 	}
 
 	async configUpdated(config, secrets) {
@@ -139,6 +143,10 @@ export default class PresenterIngestInstance extends InstanceBase {
 				timer: data.timer || null,
 				presets: data.presets || null,
 			}
+			// Dial turns not sent yet: keep showing them on top of what the site says
+			if (this.nudgePending && this.state.timer) {
+				this.state.timer = { ...this.state.timer, remaining: this.state.timer.remaining + this.nudgePending }
+			}
 			this.updateStatus(InstanceStatus.Ok, data.booking ? data.booking.title : null)
 		} catch (e) {
 			next = this.failed(e)
@@ -197,6 +205,31 @@ export default class PresenterIngestInstance extends InstanceBase {
 		this.setVariableDefinitions(variableDefinitions(this.state, this.presetSeats))
 		const [structure, presets] = presetDefinitions(this)
 		this.setPresetDefinitions(structure, presets)
+	}
+
+	/**
+	 * Dial turns: shown on the countdown at once, then added up and sent at most every
+	 * NUDGE_MS, so a fast spin is a request or two rather than dozens (the site allows
+	 * about 10 a second per booking). Does nothing without a countdown.
+	 */
+	nudgeTimer(seconds) {
+		if (!seconds || !this.state.timer) {
+			return
+		}
+		this.nudgePending = (this.nudgePending || 0) + seconds
+		this.state = { ...this.state, timer: { ...this.state.timer, remaining: this.state.timer.remaining + seconds } }
+		this.setVariableValues(variableValues(this.state, this.presetSeats))
+		this.checkAllFeedbacks()
+		if (!this.nudgeTimeout) {
+			this.nudgeTimeout = setTimeout(() => {
+				this.nudgeTimeout = null
+				const total = this.nudgePending
+				this.nudgePending = 0
+				if (total) {
+					this.call('Countdown', (api) => api.timer({ mode: 'adjust', seconds: total }))
+				}
+			}, NUDGE_MS)
+		}
 	}
 
 	/** Runs an action's API call, logs a refusal, and refreshes straight away */

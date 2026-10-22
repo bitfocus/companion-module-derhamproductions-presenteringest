@@ -142,8 +142,12 @@ test('builds actions, feedbacks, variables and presets for the seats', () => {
 	// presets only use actions and feedbacks that exist
 	for (const p of Object.values(presets)) {
 		for (const step of p.steps) {
-			const held = Object.keys(step).filter((k) => /^d+$/.test(k)).flatMap((k) => step[k].actions)
-			for (const a of [...step.down, ...step.up, ...held]) assert.ok(actions[a.actionId], `action ${a.actionId}`)
+			const held = Object.keys(step).filter((k) => /^\d+$/.test(k)).flatMap((k) => step[k].actions)
+			const turns = [...(step.rotate_left || []), ...(step.rotate_right || [])]
+			for (const a of [...step.down, ...step.up, ...held, ...turns]) assert.ok(actions[a.actionId], `action ${a.actionId}`)
+			if (p.style.text.includes('$(')) {
+				assert.ok(p.previewStyle && !p.previewStyle.text.includes('$('), `${p.name} has a preview`)
+			}
 		}
 		for (const f of p.feedbacks) assert.ok(feedbacks[f.feedbackId], `feedback ${f.feedbackId}`)
 	}
@@ -289,3 +293,40 @@ test(
 		)
 	},
 )
+
+test('a dial on the countdown: turns show at once and are sent together', async () => {
+	const { default: Instance } = await import('../src/main.js')
+	const sent = []
+	const self = {
+		presetSeats: 0,
+		state: { ...emptyState(), connected: true, timer: { remaining: 300, paused: false, overtime: false, label: '' } },
+		shown: [],
+		setVariableValues(values) {
+			this.shown.push(values.timer)
+		},
+		checkAllFeedbacks() {},
+		call: async (_what, fn) => fn({ timer: async (body) => sent.push(body) }),
+	}
+	const nudge = (s) => Instance.prototype.nudgeTimer.call(self, s)
+	nudge(15)
+	nudge(15)
+	nudge(-15)
+	nudge(15)
+	assert.deepEqual(self.shown, ['5:15', '5:30', '5:15', '5:30'])
+	assert.deepEqual(sent, [])
+	await new Promise((r) => setTimeout(r, 500))
+	assert.deepEqual(sent, [{ mode: 'adjust', seconds: 30 }])
+	// No countdown: nothing to nudge
+	self.state.timer = null
+	nudge(15)
+	await new Promise((r) => setTimeout(r, 500))
+	assert.equal(sent.length, 1)
+
+	// The countdown preset turns with the dial, and previews a time instead of its variable
+	const [, presets] = presetDefinitions({ ...self, label: 'pi', state: emptyState() })
+	const step = presets.timer_display.steps[0]
+	assert.deepEqual(step.rotate_right[0], { actionId: 'timer_nudge', options: { seconds: 15 } })
+	assert.deepEqual(step.rotate_left[0], { actionId: 'timer_nudge', options: { seconds: -15 } })
+	assert.equal(presets.timer_display.previewStyle.text, '4:05')
+	assert.ok(!presets.seat_1.previewStyle.text.includes('$('))
+})
