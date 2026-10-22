@@ -6,6 +6,14 @@ See [HELP.md](./companion/HELP.md) for how to use it.
 
 Needs Companion 4.3 or later (module API 2.0, Node 22 runtime).
 
+## Install
+
+Until it's in Companion's own list of modules:
+
+1. Download the `.tgz` file from the [latest release](https://github.com/derhamproductions/companion-module-derhamproductions-presenteringest/releases/latest).
+2. In Companion, open **Modules**, choose **Import module package** and pick the file.
+3. Add a **Presenter Ingest** connection and paste the Companion key from your booking page on presenteringest.com.
+
 ## How it talks to Presenter Ingest
 
 The module polls `GET /pi-api/companion/v1/status` and posts changes to `seat`, `cue`, `banner` and `timer` on the same path. It sends the booking's Companion key in the `X-Presenter-Ingest-Key` header:
