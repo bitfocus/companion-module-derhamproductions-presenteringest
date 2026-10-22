@@ -33,7 +33,7 @@ Each key works for one booking only, until the booking ends. Make a new key or p
 
 ### Presets
 
-- **Seats**: one button per seat, showing the presenter's name. Green while they're on their page, grey when the link is off; press to switch the link.
+- **Seats**: one button per seat, showing the presenter's name. Green while they're on their page, grey when the link is off. **Tap to switch the link on; hold for a second to switch it off**, so a stray press can't cut a presenter off. (You can change the hold time on the button's long-press group.)
 - **Cues**: Stand by, Next, Live, Wrap up, Time's up, Thanks and Clear for each seat, plus Stand by and Clear for everyone. A cue button lights blue while that cue is showing; press it again to clear it.
 - **Countdown**: the time (press to pause), start 1 to 30 minutes, ±1 minute, pause and clear.
 - **Banners**: each banner, and clear.

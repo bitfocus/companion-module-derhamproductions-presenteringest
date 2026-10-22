@@ -43,13 +43,24 @@ export function presetDefinitions(self) {
 	const style = (text, extra = {}) => ({ text, size: 'auto', color: COLOURS.white, bgcolor: COLOURS.night, ...extra })
 	const press = (actionId, options) => [{ down: [{ actionId, options }], up: [] }]
 
-	// Seats: name, green while they're on their page, grey when switched off; press to switch the link on/off
+	// Seats: name, green while they're on their page, grey when switched off. A tap only ever switches the
+	// link on; switching it off takes a hold, so a stray press can't cut a presenter off
+	const HOLD_MS = 1000
 	for (const n of seats) {
 		presets[`seat_${n}`] = {
 			type: 'simple',
-			name: `Seat ${n}: on their page / link on-off`,
+			name: `Seat ${n}: on their page / tap for on, hold for off`,
 			style: style(`${n}\\n${v(`seat_${n}_name`)}`),
-			steps: press('seat_link', { seat: n, state: 'toggle' }),
+			steps: [
+				{
+					down: [],
+					up: [{ actionId: 'seat_link', options: { seat: n, state: 'on' } }],
+					[HOLD_MS]: {
+						options: { runWhileHeld: true },
+						actions: [{ actionId: 'seat_link', options: { seat: n, state: 'off' } }],
+					},
+				},
+			],
 			feedbacks: [
 				{ feedbackId: 'seat_online', options: { seat: n }, style: { bgcolor: COLOURS.green, color: COLOURS.white } },
 				{ feedbackId: 'seat_off', options: { seat: n }, style: { bgcolor: COLOURS.grey, color: COLOURS.black } },
@@ -226,13 +237,13 @@ export function presetDefinitions(self) {
 		{
 			id: 'seats',
 			name: 'Seats',
-			description: `Green while the presenter is on their page, grey when the link is off. Press to switch the link on or off. ${note}`,
+			description: `Green while the presenter is on their page, grey when the link is off. Tap to switch the link on; hold for a second to switch it off, so a stray press can't cut anyone off. ${note}`,
 			definitions: seats.map((n) => `seat_${n}`).concat('status_connected'),
 		},
 		{
 			id: 'cues',
 			name: 'Cues',
-			description: `Send a cue to one presenter. Blue while that cue is showing. ${note}`,
+			description: `Send a cue to one presenter. Blue while that cue is showing; press again to clear it. ${note}`,
 			definitions: [
 				...cueGroups,
 				{ id: 'cue-clear', type: 'simple', name: 'Clear', presets: seats.map((n) => `cue_clear_${n}`) },

@@ -142,11 +142,18 @@ test('builds actions, feedbacks, variables and presets for the seats', () => {
 	// presets only use actions and feedbacks that exist
 	for (const p of Object.values(presets)) {
 		for (const step of p.steps) {
-			for (const a of step.down) assert.ok(actions[a.actionId], `action ${a.actionId}`)
+			const held = Object.keys(step).filter((k) => /^d+$/.test(k)).flatMap((k) => step[k].actions)
+			for (const a of [...step.down, ...step.up, ...held]) assert.ok(actions[a.actionId], `action ${a.actionId}`)
 		}
 		for (const f of p.feedbacks) assert.ok(feedbacks[f.feedbackId], `feedback ${f.feedbackId}`)
 	}
 	assert.match(presets.seat_1.style.text, /\$\(pi:seat_1_name\)/)
+	// A seat button: a tap only switches on, switching off needs a one-second hold
+	const seatStep = presets.seat_1.steps[0]
+	assert.deepEqual(seatStep.down, [])
+	assert.deepEqual(seatStep.up.map((a) => a.options.state), ['on'])
+	assert.equal(seatStep[1000].options.runWhileHeld, true)
+	assert.deepEqual(seatStep[1000].actions.map((a) => a.options.state), ['off'])
 })
 
 test('a cue button pressed again clears the cue', async () => {
