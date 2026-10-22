@@ -12,11 +12,11 @@ jobs:
     name: Package module
 
     # The template itself cannot be packaged, as its manifest still holds placeholders
-    # Bitfocus's shared workflow can only check out public repositories: skipped while this one is private
+    # Bitfocus's shared workflow can only check out public repositories: skipped if this one is made private
     if: ${{ !contains(github.repository, 'companion-module-template-') && !github.event.repository.private }}
 
     permissions:
-      # contents: read lets the shared workflow check out this repository while it is private
+      # contents: read lets the shared workflow check out this repository
       contents: read
       packages: read
 
