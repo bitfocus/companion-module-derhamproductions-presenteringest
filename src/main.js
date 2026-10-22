@@ -12,6 +12,9 @@ export { UpgradeScripts }
 /** Dial turns are added up and sent at most this often */
 const NUDGE_MS = 400
 
+/** Seconds between checks unless set otherwise (the countdown ticks in Companion in between) */
+export const DEFAULT_INTERVAL = 3
+
 export default class PresenterIngestInstance extends InstanceBase {
 	async init(config, _isFirstInit, secrets) {
 		this.state = emptyState()
@@ -20,12 +23,16 @@ export default class PresenterIngestInstance extends InstanceBase {
 		this.applyConfig(config, secrets)
 		this.defineAll()
 		this.schedule(0)
+		// The countdown counts down here between checks, so checks can be a few seconds apart
+		this.tickAt = Date.now()
+		this.ticker = setInterval(() => this.tick(), 250)
 	}
 
 	async destroy() {
 		this.stopped = true
 		clearTimeout(this.timer)
 		clearTimeout(this.nudgeTimeout)
+		clearInterval(this.ticker)
 	}
 
 	async configUpdated(config, secrets) {
@@ -88,8 +95,10 @@ export default class PresenterIngestInstance extends InstanceBase {
 				type: 'number',
 				id: 'interval',
 				label: 'Check every (seconds)',
+				tooltip:
+					'How often to fetch the booking. The countdown keeps counting in between, and button presses fetch it straight away, so 3 is plenty; less means more requests to the site.',
 				width: 4,
-				default: 1,
+				default: DEFAULT_INTERVAL,
 				min: 1,
 				max: 10,
 				asInteger: true,
@@ -101,7 +110,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 		this.config = config || {}
 		const key = String((secrets && secrets.key) || '').trim()
 		this.api = new PresenterIngestApi(this.config.host, key)
-		this.interval = Math.min(10, Math.max(1, Number(this.config.interval) || 1)) * 1000
+		this.interval = Math.min(10, Math.max(1, Number(this.config.interval) || DEFAULT_INTERVAL)) * 1000
 		// Missing in configs saved before 0.3.0: names on, as before
 		this.showNames = this.config.show_names !== false
 		this.presetSeats = Math.min(MAX_SEATS, Math.max(0, Math.floor(Number(this.config.preset_seats) || 0)))
@@ -148,6 +157,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 			if (this.nudgePending && this.state.timer) {
 				this.state.timer = { ...this.state.timer, remaining: this.state.timer.remaining + this.nudgePending }
 			}
+			this.tickAt = Date.now()
 			this.updateStatus(InstanceStatus.Ok, data.booking ? data.booking.title : null)
 		} catch (e) {
 			next = this.failed(e)
@@ -239,6 +249,24 @@ export default class PresenterIngestInstance extends InstanceBase {
 				}
 			}, NUDGE_MS)
 		}
+	}
+
+	/**
+	 * Counts a running countdown down (or up, in overtime) between checks, a whole second at
+	 * a time from when the site last said where it was. Stops at 0:00 unless it counts overtime.
+	 */
+	tick() {
+		const t = this.state.timer
+		const now = Date.now()
+		const whole = Math.floor((now - (this.tickAt || now)) / 1000)
+		if (!t || t.paused || whole < 1 || (t.remaining <= 0 && !t.overtime)) {
+			if (whole >= 1) this.tickAt += whole * 1000
+			return
+		}
+		this.tickAt += whole * 1000
+		this.state = { ...this.state, timer: { ...t, remaining: t.remaining - whole } }
+		this.setVariableValues(variableValues(this.state, this.presetSeats))
+		this.checkAllFeedbacks()
 	}
 
 	/** Sets up a countdown in Companion without starting it (null to forget it) */

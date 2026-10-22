@@ -409,3 +409,52 @@ test('a banner button pressed again clears the banner', async () => {
 		['break', '', '15:00'],
 	])
 })
+
+test('the countdown ticks in Companion between checks', async () => {
+	const { default: Instance } = await import('../src/main.js')
+	const shown = []
+	const self = {
+		presetSeats: 0,
+		state: { ...emptyState(), connected: true, timer: { remaining: 65, paused: false, overtime: false, label: '' } },
+		tickAt: Date.now() - 3200,
+		setVariableValues(values) {
+			shown.push(values.timer)
+		},
+		checkAllFeedbacks() {},
+	}
+	const tick = () => Instance.prototype.tick.call(self)
+	tick()
+	assert.equal(self.state.timer.remaining, 62)
+	assert.deepEqual(shown, ['1:02'])
+	// Nothing until another whole second has passed
+	tick()
+	assert.equal(shown.length, 1)
+	// Paused: holds
+	self.state.timer.paused = true
+	self.tickAt -= 5000
+	tick()
+	assert.equal(self.state.timer.remaining, 62)
+	// Run out without overtime: stops at 0:00
+	self.state.timer = { remaining: 1, paused: false, overtime: false, label: '' }
+	self.tickAt = Date.now() - 4000
+	tick()
+	tick()
+	assert.equal(shown.at(-1), '0:00')
+	const stopped = self.state.timer.remaining
+	self.tickAt -= 3000
+	tick()
+	assert.equal(self.state.timer.remaining, stopped)
+	// Overtime: counts on
+	self.state.timer = { remaining: -10, paused: false, overtime: true, label: '' }
+	self.tickAt = Date.now() - 2000
+	tick()
+	assert.equal(shown.at(-1), '+0:12')
+})
+
+test('connections on the old 1-second default move to 3 seconds', async () => {
+	const { UpgradeScripts } = await import('../src/upgrades.js')
+	const run = (config) => UpgradeScripts[0]({}, { config, actions: [], feedbacks: [] }).updatedConfig
+	assert.equal(run({ interval: 1, host: 'https://presenteringest.com' }).interval, 3)
+	assert.equal(run({ interval: 5 }), null)
+	assert.equal(run(null), null)
+})

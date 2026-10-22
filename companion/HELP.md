@@ -47,6 +47,6 @@ To build buttons for a set number of seats, choose it under **Preset seats** in 
 
 ### Notes
 
-- The module checks the booking every second (change it under **Check every**). Presenter Ingest allows about 10 requests a second per booking, plenty for polling and button presses.
+- The module checks the booking every 3 seconds (change it under **Check every**). The countdown keeps counting in Companion in between, and a button press checks straight away, so buttons still update at once. Presenter Ingest allows about 10 requests a second per booking.
 - Changes need the booking to be running (links open). Seats can be switched on and off before then too.
 - The module only talks to the site address over https, never follows redirects, and never writes the key to the log.
