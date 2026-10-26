@@ -7,8 +7,8 @@
 	"description": "Run a Presenter Ingest booking: presenter seats on and off, who's on their page, banners, countdowns and cues",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/derhamproductions/companion-module-derhamproductions-presenteringest.git",
-	"bugs": "https://github.com/derhamproductions/companion-module-derhamproductions-presenteringest/issues",
+	"repository": "git+https://github.com/bitfocus/companion-module-derhamproductions-presenteringest.git",
+	"bugs": "https://github.com/bitfocus/companion-module-derhamproductions-presenteringest/issues",
 	"maintainers": [
 		{
 			"name": "Derham Productions",
