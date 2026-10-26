@@ -4,7 +4,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanHost, validKey, PresenterIngestApi, ApiError } from '../src/api.js'
-import { formatTimer, timerState, seatChoices, emptyState, buttonSeats, seatsFromStatus, hasCue } from '../src/state.js'
+import {
+	formatTimer,
+	timerState,
+	seatChoices,
+	emptyState,
+	buttonSeats,
+	seatsFromStatus,
+	hasCue,
+	callinFromStatus,
+	callinSlots,
+	guestLabel,
+	shapeKey,
+	slotChoices,
+} from '../src/state.js'
 import { actionDefinitions } from '../src/actions.js'
 import { feedbackDefinitions } from '../src/feedbacks.js'
 import { presetDefinitions, seatsNote } from '../src/presets.js'
@@ -286,6 +299,17 @@ test(
 		await api.timer({ mode: 'clear' })
 		assert.equal((await api.status()).timer, null)
 
+		// Call in Q&A, when the test booking has it
+		if (status.callin) {
+			const open = status.callin.open
+			assert.equal((await api.callin({ action: 'toggle' })).open, !open)
+			const callin = callinFromStatus((await api.status()).callin)
+			assert.equal(callin.open, !open)
+			assert.ok(callin.slots.length > 0)
+			await api.callin({ action: open ? 'open' : 'close' })
+			await assert.rejects(api.callin({ action: 'end', slot: 99 }), (e) => e.status === 404)
+		}
+
 		await assert.rejects(api.setSeat(99, 'on'), (e) => e.status === 404)
 		await assert.rejects(
 			new PresenterIngestApi(host, 'pic1_nosuch0001_' + 'b'.repeat(40)).status(),
@@ -495,4 +519,167 @@ test('uses the site\'s lighter status address, only as a path on the same site, 
 	const sub = new PresenterIngestApi('https://presenteringest.com', KEY, async () => new Response(JSON.stringify({ ok: true, seats: [], fast: '/events/pi-fast.php?c=1' }), { status: 200 }))
 	await sub.status()
 	assert.equal(sub.fastPath, '/events/pi-fast.php?c=1')
+})
+
+// Call in Q&A, as the status sends it
+const CALLIN = {
+	open: true,
+	waiting: 2,
+	next: { name: 'Ada Example', org: 'Example Trust', question: 'How do we start?' },
+	slots: [
+		{
+			n: 1,
+			ready: true,
+			guest: { name: 'Bo Sample', org: 'Sample Ltd', question: 'Costs?', online: true, on_air: 125, cue: 'wrap' },
+		},
+		{ n: 2, ready: false, guest: null },
+	],
+}
+
+test('Call in Q&A: variables, feedbacks and presets from the status', () => {
+	const now = 1_000_000
+	const state = { ...STATE, callin: callinFromStatus(CALLIN, true, now) }
+	assert.equal(state.callin.slots[0].guest.since, now - 125_000)
+	assert.deepEqual(callinSlots(state), [1, 2])
+	assert.deepEqual(callinSlots(emptyState()), [1, 2])
+	assert.equal(guestLabel(state.callin.slots[0].guest), 'Bo Sample, Sample Ltd')
+	assert.equal(guestLabel({ name: 'Bo', org: '' }), 'Bo')
+
+	const defs = variableDefinitions(state)
+	const values = variableValues(state, 0, now + 3000)
+	for (const id of Object.keys(values)) {
+		assert.ok(defs[id], `variable ${id} has a definition`)
+	}
+	assert.equal(values.callin_open, true)
+	assert.equal(values.callin_waiting, 2)
+	assert.equal(values.callin_next_name, 'Ada Example')
+	assert.equal(values.callin_slot_1_label, 'Bo Sample, Sample Ltd')
+	assert.equal(values.callin_slot_1_question, 'Costs?')
+	assert.equal(values.callin_slot_1_on_air, '2:08')
+	assert.equal(values.callin_slot_1_online, true)
+	assert.equal(values.callin_slot_1_cue, 'Please wrap up')
+	assert.equal(values.callin_slot_2_name, '')
+	assert.equal(values.callin_slot_2_on_air, '')
+
+	const self = fakeInstance(state)
+	const feedbacks = feedbackDefinitions(self)
+	assert.equal(feedbacks.callin_open.callback({ options: {} }), true)
+	assert.equal(feedbacks.callin_waiting.callback({ options: { count: 1 } }), true)
+	assert.equal(feedbacks.callin_waiting.callback({ options: { count: 3 } }), false)
+	assert.equal(feedbacks.callin_slot_live.callback({ options: { slot: 1 } }), true)
+	assert.equal(feedbacks.callin_slot_live.callback({ options: { slot: 2 } }), false)
+	assert.equal(feedbacks.callin_slot_lost.callback({ options: { slot: 1 } }), false)
+	assert.equal(feedbacks.callin_slot_cue.callback({ options: { slot: 1, cue: 'wrap' } }), true)
+	assert.equal(feedbacks.callin_slot_cue.callback({ options: { slot: 1, cue: 'time' } }), false)
+	assert.equal(feedbacks.callin_slot_cue.callback({ options: { slot: 1, cue: 'any' } }), true)
+	state.callin.slots[0].guest.online = false
+	assert.equal(feedbacks.callin_slot_lost.callback({ options: { slot: 1 } }), true)
+
+	const [structure, presets] = presetDefinitions(self)
+	const section = structure.find((s) => s.id === 'callin')
+	assert.ok(section.definitions.includes('callin_slot_2'))
+	assert.match(presets.callin_slot_1.style.text, /\$\(pi:callin_slot_1_on_air\)/)
+	assert.match(presets.callin_slot_1.previewStyle.text, /Bo Sample/)
+	// Ending a call takes a one-second hold; a tap does nothing
+	const step = presets.callin_slot_1.steps[0]
+	assert.deepEqual([...step.down, ...step.up], [])
+	assert.deepEqual(step[1000].actions, [{ actionId: 'callin_end', options: { slot: 1 } }])
+	assert.deepEqual(presets.callin_admit.steps[0].down[0].options, { slot: 0 })
+	assert.equal(shapeKey(state), shapeKey({ ...state, callin: callinFromStatus({ ...CALLIN, waiting: 5 }) }))
+	assert.notEqual(shapeKey(state), shapeKey(STATE))
+})
+
+test("Call in Q&A: names off, a steady clock on air, and bookings that don't have it", () => {
+	const off = callinFromStatus(CALLIN, false)
+	assert.deepEqual(off.next, { name: 'Guest', org: '', question: '' })
+	assert.equal(off.slots[0].guest.name, 'Guest')
+	assert.ok(!JSON.stringify(off).includes('Sample') && !JSON.stringify(off).includes('Costs'))
+
+	// The clock on air keeps its start between checks unless the site says otherwise
+	const first = callinFromStatus(CALLIN, true, 1_000_000)
+	const slot = { ...CALLIN.slots[0], guest: { ...CALLIN.slots[0].guest, on_air: 131 } }
+	const later = callinFromStatus({ ...CALLIN, slots: [slot] }, true, 1_005_700, first)
+	assert.equal(later.slots[0].guest.since, first.slots[0].guest.since)
+	const moved = callinFromStatus(CALLIN, true, 1_060_000, first)
+	assert.equal(moved.slots[0].guest.since, 1_060_000 - 125_000)
+
+	assert.equal(callinFromStatus(null), null)
+	assert.equal(callinFromStatus({ open: true }), null)
+	const without = { ...STATE, callin: null }
+	const values = variableValues(without)
+	assert.equal(values.callin_open, false)
+	assert.equal(values.callin_waiting, 0)
+	assert.equal(values.callin_slot_1_name, '')
+	const [structure] = presetDefinitions(fakeInstance(without))
+	assert.match(structure.find((s) => s.id === 'callin').description, /doesn't have Call in Q&A/)
+	const feedbacks = feedbackDefinitions(fakeInstance(without))
+	assert.equal(feedbacks.callin_open.callback({ options: {} }), false)
+	assert.equal(feedbacks.callin_slot_live.callback({ options: { slot: 1 } }), false)
+	assert.deepEqual(
+		slotChoices(emptyState(), true).map((c) => c.id),
+		[0, 1, 2, 3, 4],
+	)
+})
+
+test('Call in Q&A actions send the right requests; a cue pressed again clears it', async () => {
+	const sent = []
+	const self = {
+		presetSeats: 0,
+		state: { ...STATE, callin: callinFromStatus(CALLIN) },
+		call: async (_what, fn) => fn({ callin: async (body) => sent.push(body) }),
+	}
+	const actions = actionDefinitions(self)
+	assert.deepEqual(
+		actions.callin_admit.options[0].choices.map((c) => c.id),
+		[0, 1, 2],
+	)
+	await actions.callin_queue.callback({ options: { state: 'toggle' } })
+	await actions.callin_admit.callback({ options: { slot: 0 } })
+	await actions.callin_end.callback({ options: { slot: 1 } })
+	await actions.callin_cue.callback({ options: { slot: 1, cue: 'wrap', text: '' } })
+	await actions.callin_cue.callback({ options: { slot: 1, cue: 'time', text: '' } })
+	await actions.callin_cue.callback({ options: { slot: 1, cue: 'wrap', text: '', again: false } })
+	await actions.callin_cue.callback({ options: { slot: 2, cue: 'custom', text: 'One more minute' } })
+	await actions.callin_cue_clear.callback({ options: { slot: 1 } })
+	assert.deepEqual(sent, [
+		{ action: 'toggle' },
+		{ action: 'admit', slot: 0 },
+		{ action: 'end', slot: 1 },
+		{ action: 'cue', slot: 1, preset: 'none', text: '' },
+		{ action: 'cue', slot: 1, preset: 'time', text: '' },
+		{ action: 'cue', slot: 1, preset: 'wrap', text: '' },
+		{ action: 'cue', slot: 2, preset: 'custom', text: 'One more minute' },
+		{ action: 'cue', slot: 1, preset: 'none' },
+	])
+
+	const calls = []
+	const api = new PresenterIngestApi('https://presenteringest.com', KEY, async (url, init) => {
+		calls.push({ url, init })
+		return new Response(JSON.stringify({ ok: true, open: true }), { status: 200 })
+	})
+	await api.callin({ action: 'open' })
+	assert.equal(calls[0].url, 'https://presenteringest.com/pi-api/companion/v1/callin')
+	assert.equal(calls[0].init.method, 'POST')
+})
+
+test('time on air ticks in Companion between checks, with no countdown running', async () => {
+	const { default: Instance } = await import('../src/main.js')
+	const shown = []
+	const self = {
+		presetSeats: 0,
+		state: { ...STATE, timer: null, callin: callinFromStatus(CALLIN, true, Date.now()) },
+		tickAt: Date.now() - 2100,
+		setVariableValues(values) {
+			shown.push(values.callin_slot_1_on_air)
+		},
+		checkAllFeedbacks() {},
+	}
+	Instance.prototype.tick.call(self)
+	// The site said 2:05 on air just now
+	assert.deepEqual(shown, ['2:05'])
+	// Nobody on air and no countdown: nothing to update
+	self.state = { ...self.state, callin: callinFromStatus({ ...CALLIN, slots: [{ n: 1, ready: true, guest: null }] }) }
+	self.tickAt -= 3000
+	Instance.prototype.tick.call(self)
+	assert.equal(shown.length, 1)
 })

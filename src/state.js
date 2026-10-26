@@ -26,7 +26,17 @@ export const MAX_SEATS = 24
 export function emptyState() {
 	// staged: a countdown set up in Companion but not started ({ seconds, label, overtime }), which
 	// presenters don't see until it's started
-	return { connected: false, booking: null, seats: [], banner: null, timer: null, presets: null, staged: null }
+	// callin: Call in Q&A (null when the booking doesn't have it), from callinFromStatus()
+	return {
+		connected: false,
+		booking: null,
+		seats: [],
+		banner: null,
+		timer: null,
+		presets: null,
+		staged: null,
+		callin: null,
+	}
 }
 
 /** The longest countdown the site takes (600 minutes) */
@@ -139,7 +149,81 @@ export function buttonSeats(state, presetSeats = 0) {
 	return Array.from({ length: OFFLINE_SEATS }, (_, i) => i + 1)
 }
 
-/** A short "what does the state look like" key, so definitions are only rebuilt when seats change */
+/** A short "what does the state look like" key, so definitions are only rebuilt when seats or guest slots change */
 export function shapeKey(state) {
-	return JSON.stringify([state.seats.map((s) => [s.n, s.name]), state.presets])
+	return JSON.stringify([state.seats.map((s) => [s.n, s.name]), state.presets, state.callin && callinSlots(state)])
+}
+
+// ---------------------------------------------------------------- Call in Q&A
+
+/** Bookings have 1, 2 or 4 guest slots */
+export const MAX_GUEST_SLOTS = 4
+/** Guest slots that get preset buttons before the booking says how many it has */
+export const OFFLINE_GUEST_SLOTS = 2
+
+/**
+ * Call in Q&A from a status reply: { open, waiting, next, slots: [{ n, ready, guest }] }, or
+ * null when the booking doesn't have it. With names off, guests' names (just "Guest"),
+ * organisations and questions are dropped there and then, as presenter names are. Each guest on air gets
+ * `since` (when they went on air, by this computer's clock) so the time on air can tick;
+ * it's kept from the last check while it agrees to within 2 seconds, so the clock doesn't
+ * jump back a second at each check.
+ */
+export function callinFromStatus(callin, showNames = true, now = Date.now(), previous = null) {
+	if (!callin || typeof callin !== 'object' || !Array.isArray(callin.slots)) {
+		return null
+	}
+	const person = (p) => (showNames ? p : { ...p, name: 'Guest', org: '', question: '' })
+	return {
+		open: !!callin.open,
+		waiting: Math.max(0, Number(callin.waiting) || 0),
+		next: callin.next ? person(callin.next) : null,
+		slots: callin.slots.map((s) => {
+			if (!s.guest) {
+				return { n: Number(s.n), ready: !!s.ready, guest: null }
+			}
+			let since = now - (Number(s.guest.on_air) || 0) * 1000
+			const before = previous && previous.slots.find((p) => p.n === Number(s.n))
+			if (before && before.guest && Math.abs(before.guest.since - since) < 2000) {
+				since = before.guest.since
+			}
+			return { n: Number(s.n), ready: !!s.ready, guest: { ...person(s.guest), since } }
+		}),
+	}
+}
+
+/** The guest slot numbers: the booking's, or OFFLINE_GUEST_SLOTS until it says */
+export function callinSlots(state) {
+	if (state.callin && state.callin.slots.length) {
+		return state.callin.slots.map((s) => s.n)
+	}
+	return Array.from({ length: OFFLINE_GUEST_SLOTS }, (_, i) => i + 1)
+}
+
+/** The guest on air in a slot, or null */
+export function guest(state, n) {
+	const slot = state.callin ? state.callin.slots.find((s) => s.n === Number(n)) : null
+	return (slot && slot.guest) || null
+}
+
+export function slotChoices(state, withFirstFree = false) {
+	const numbers = state.callin
+		? callinSlots(state)
+		: Array.from({ length: MAX_GUEST_SLOTS }, (_, i) => i + 1)
+	// No guest names here: they change with every call, and the lists are only rebuilt when the slots do
+	const slots = numbers.map((n) => ({ id: n, label: `Guest slot ${n}` }))
+	return withFirstFree ? [{ id: 0, label: 'First free slot' }, ...slots] : slots
+}
+
+/** "Name, Organisation", or whichever there is */
+export function guestLabel(g) {
+	return g ? [g.name, g.org].filter(Boolean).join(', ') : ''
+}
+
+/** How long a guest has been on air, as 4:05 */
+export function onAir(g, now = Date.now()) {
+	if (!g) {
+		return ''
+	}
+	return formatTimer({ remaining: Math.max(0, Math.floor((now - g.since) / 1000)) })
 }

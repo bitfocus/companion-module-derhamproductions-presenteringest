@@ -138,4 +138,9 @@ export class PresenterIngestApi {
 	timer(body) {
 		return this.request('timer', body)
 	}
+
+	/** Call in Q&A: { action: open | close | toggle | admit | end | cue, slot, preset, text } */
+	callin(body) {
+		return this.request('callin', body)
+	}
 }

@@ -3,7 +3,7 @@ import { ApiError, cleanHost, DEFAULT_HOST, PresenterIngestApi, validKey } from 
 import { actionDefinitions } from './actions.js'
 import { feedbackDefinitions } from './feedbacks.js'
 import { presetDefinitions } from './presets.js'
-import { emptyState, MAX_SEATS, MAX_TIMER_SECONDS, seatsFromStatus, shapeKey } from './state.js'
+import { callinFromStatus, emptyState, MAX_SEATS, MAX_TIMER_SECONDS, seatsFromStatus, shapeKey } from './state.js'
 import { variableDefinitions, variableValues } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 
@@ -152,6 +152,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 				timer: data.timer || null,
 				presets: data.presets || null,
 				staged: this.state.staged,
+				callin: callinFromStatus(data.callin, this.showNames, Date.now(), this.state.callin),
 			}
 			// Dial turns not sent yet: keep showing them on top of what the site says
 			if (this.nudgePending && this.state.timer) {
@@ -254,19 +255,25 @@ export default class PresenterIngestInstance extends InstanceBase {
 	/**
 	 * Counts a running countdown down (or up, in overtime) between checks, a whole second at
 	 * a time from when the site last said where it was. Stops at 0:00 unless it counts overtime.
+	 * Guests' time on air ticks too.
 	 */
 	tick() {
 		const t = this.state.timer
 		const now = Date.now()
 		const whole = Math.floor((now - (this.tickAt || now)) / 1000)
-		if (!t || t.paused || whole < 1 || (t.remaining <= 0 && !t.overtime)) {
-			if (whole >= 1) this.tickAt += whole * 1000
+		if (whole < 1) {
 			return
 		}
 		this.tickAt += whole * 1000
-		this.state = { ...this.state, timer: { ...t, remaining: t.remaining - whole } }
-		this.setVariableValues(variableValues(this.state, this.presetSeats))
-		this.checkAllFeedbacks()
+		const counting = !!(t && !t.paused && (t.remaining > 0 || t.overtime))
+		const onAir = !!(this.state.callin && this.state.callin.slots.some((s) => s.guest))
+		if (counting) {
+			this.state = { ...this.state, timer: { ...t, remaining: t.remaining - whole } }
+		}
+		if (counting || onAir) {
+			this.setVariableValues(variableValues(this.state, this.presetSeats))
+			this.checkAllFeedbacks()
+		}
 	}
 
 	/** Sets up a countdown in Companion without starting it (null to forget it) */

@@ -1,5 +1,5 @@
 import { COLOURS } from './feedbacks.js'
-import { bannerChoices, buttonSeats, OFFLINE_SEATS } from './state.js'
+import { bannerChoices, buttonSeats, callinSlots, guest, onAir, OFFLINE_SEATS } from './state.js'
 
 // Short button words for the cue presets (the server's labels are longer)
 const CUE_WORDS = {
@@ -277,6 +277,71 @@ export function presetDefinitions(self) {
 		feedbacks: [{ feedbackId: 'connected', options: {}, style: { bgcolor: COLOURS.night, color: COLOURS.white } }],
 	}
 
+	// Call in Q&A: the queue, bring in the next guest, and a button per guest slot that ends the
+	// call on a hold (like switching a seat off), with cues for the guest on air
+	const callin = self.state.callin
+	const slots = callinSlots(self.state)
+	presets.callin_queue = {
+		type: 'simple',
+		name: 'Call in Q&A: queue open / closed, with guests waiting',
+		style: style(`Q&A queue\\n${v('callin_waiting')} waiting`, { size: '14', bgcolor: COLOURS.grey }),
+		previewStyle: preview(`Q&A queue\\n${callin ? callin.waiting : 0} waiting`),
+		steps: press('callin_queue', { state: 'toggle' }),
+		feedbacks: [{ feedbackId: 'callin_open', options: {}, style: { bgcolor: COLOURS.green, color: COLOURS.white } }],
+	}
+	presets.callin_admit = {
+		type: 'simple',
+		name: 'Call in Q&A: bring in the next guest',
+		style: style(`Bring in\\n${v('callin_next_name')}`, { size: '14' }),
+		previewStyle: preview(`Bring in\\n${(callin && callin.next && callin.next.name) || ''}`),
+		steps: press('callin_admit', { slot: 0 }),
+		feedbacks: [
+			{ feedbackId: 'callin_waiting', options: { count: 1 }, style: { bgcolor: COLOURS.amber, color: COLOURS.black } },
+		],
+	}
+	for (const n of slots) {
+		const g = guest(self.state, n)
+		presets[`callin_slot_${n}`] = {
+			type: 'simple',
+			name: `Guest slot ${n}: on air / hold to end the call`,
+			style: style(`G${n} ${v(`callin_slot_${n}_on_air`)}\\n${v(`callin_slot_${n}_name`)}`, { size: '14' }),
+			previewStyle: preview(`G${n} ${onAir(g)}\\n${(g && g.name) || ''}`),
+			steps: [
+				{
+					down: [],
+					up: [],
+					[HOLD_MS]: {
+						options: { runWhileHeld: true },
+						actions: [{ actionId: 'callin_end', options: { slot: n } }],
+					},
+				},
+			],
+			feedbacks: [
+				{ feedbackId: 'callin_slot_live', options: { slot: n }, style: { bgcolor: COLOURS.red, color: COLOURS.white } },
+				{
+					feedbackId: 'callin_slot_lost',
+					options: { slot: n },
+					style: { bgcolor: COLOURS.amber, color: COLOURS.black },
+				},
+			],
+		}
+		for (const cue of ['wrap', 'time', 'thanks']) {
+			presets[`callin_cue_${cue}_${n}`] = {
+				type: 'simple',
+				name: `Guest slot ${n}: ${CUE_WORDS[cue]}`,
+				style: style(`${CUE_WORDS[cue]}\\nGuest ${n}`, { size: '14' }),
+				steps: press('callin_cue', { slot: n, cue, text: '', again: true }),
+				feedbacks: [
+					{
+						feedbackId: 'callin_slot_cue',
+						options: { slot: n, cue },
+						style: { bgcolor: COLOURS.blue, color: COLOURS.white },
+					},
+				],
+			}
+		}
+	}
+
 	const cueGroups = Object.entries(CUE_WORDS).map(([cue, word]) => ({
 		id: `cue-${cue}`,
 		type: 'simple',
@@ -320,6 +385,29 @@ export function presetDefinitions(self) {
 			name: 'Banners',
 			description: 'The banner on every presenter page. Blue while it is showing.',
 			definitions: banners.map((b) => `banner_${b.id}`).concat('banner_clear'),
+		},
+		{
+			id: 'callin',
+			name: 'Call in Q&A',
+			description:
+				`For bookings with Call in Q&A. Queue: green while open, showing how many are waiting. Bring in: amber while someone is waiting; puts the next guest into the first free guest slot. Guest slot buttons: red while a guest is on air, with their name and time on air, amber if they close their page; hold for a second to end the call. ${
+					self.state.connected && !callin
+						? "This booking doesn't have Call in Q&A: add it on the booking page."
+						: callin
+							? ''
+							: `Not connected yet, so these are for guest slots 1 to ${slots.length}.`
+				}`.trim(),
+			definitions: [
+				'callin_queue',
+				'callin_admit',
+				...slots.map((n) => `callin_slot_${n}`),
+				...['wrap', 'time', 'thanks'].map((cue) => ({
+					id: `callin-${cue}`,
+					type: 'simple',
+					name: CUE_WORDS[cue],
+					presets: slots.map((n) => `callin_cue_${cue}_${n}`),
+				})),
+			],
 		},
 	]
 

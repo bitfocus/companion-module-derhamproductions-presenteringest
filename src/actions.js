@@ -1,4 +1,4 @@
-import { bannerChoices, cueChoices, hasCue, MAX_TIMER_SECONDS, seatChoices } from './state.js'
+import { bannerChoices, cueChoices, guest, hasCue, MAX_TIMER_SECONDS, seatChoices, slotChoices } from './state.js'
 
 /**
  * Every action calls the API, then asks for a fresh status so buttons update at once.
@@ -10,6 +10,14 @@ export function actionDefinitions(self) {
 	const firstSeat = seats.length ? seats[0].id : 1
 	const cues = cueChoices(self.state)
 	const banners = bannerChoices(self.state)
+	const slotOption = (withFirstFree = false) => ({
+		id: 'slot',
+		type: 'dropdown',
+		label: 'Guest slot',
+		choices: slotChoices(self.state, withFirstFree),
+		default: withFirstFree ? 0 : 1,
+		allowCustom: true,
+	})
 
 	const seatOption = (choices = seats, def = firstSeat) => ({
 		id: 'seat',
@@ -288,6 +296,82 @@ export function actionDefinitions(self) {
 				self.setStaged(null)
 				return self.call('Countdown', (api) => api.timer({ mode: 'clear' }))
 			},
+		},
+
+		callin_queue: {
+			name: 'Call in Q&A: open / close the queue',
+			description: 'While the queue is closed, guests can still open their page but can’t join the queue.',
+			options: [
+				{
+					id: 'state',
+					type: 'dropdown',
+					label: 'Set to',
+					choices: [
+						{ id: 'toggle', label: 'Toggle' },
+						{ id: 'open', label: 'Open' },
+						{ id: 'close', label: 'Closed' },
+					],
+					default: 'toggle',
+				},
+			],
+			callback: async ({ options }) => self.call('Call in Q&A', (api) => api.callin({ action: String(options.state) })),
+		},
+
+		callin_admit: {
+			name: 'Call in Q&A: bring in the next guest',
+			description:
+				'Puts the first guest in the queue who has their page open into a guest slot, and their page connects to that slot’s vMix call. The slot needs a studio connection on the booking page.',
+			options: [slotOption(true)],
+			callback: async ({ options }) =>
+				self.call('Call in Q&A', (api) => api.callin({ action: 'admit', slot: Number(options.slot) || 0 })),
+		},
+
+		callin_end: {
+			name: 'Call in Q&A: end a guest’s call',
+			description: 'The guest’s call ends and the slot is free for the next guest.',
+			options: [slotOption()],
+			callback: async ({ options }) =>
+				self.call('Call in Q&A', (api) => api.callin({ action: 'end', slot: Number(options.slot) })),
+		},
+
+		callin_cue: {
+			name: 'Call in Q&A: cue a guest',
+			options: [
+				slotOption(),
+				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'wrap' },
+				{
+					id: 'text',
+					type: 'textinput',
+					label: 'Custom message',
+					default: '',
+					useVariables: true,
+					isVisibleExpression: "$(options:cue) == 'custom'",
+				},
+				{
+					id: 'again',
+					type: 'checkbox',
+					label: 'Pressing again clears it',
+					tooltip: 'When the guest already has this cue, the press clears it instead',
+					default: true,
+				},
+			],
+			callback: async ({ options }) => {
+				const slot = Number(options.slot)
+				const cue = String(options.cue)
+				const g = guest(self.state, slot)
+				// The status only says which cue, so a custom message is matched on that alone
+				const preset = options.again !== false && g && g.cue === cue ? 'none' : cue
+				return self.call('Call in Q&A', (api) =>
+					api.callin({ action: 'cue', slot, preset, text: String(options.text || '') }),
+				)
+			},
+		},
+
+		callin_cue_clear: {
+			name: 'Call in Q&A: clear a guest’s cue',
+			options: [slotOption()],
+			callback: async ({ options }) =>
+				self.call('Call in Q&A', (api) => api.callin({ action: 'cue', slot: Number(options.slot), preset: 'none' })),
 		},
 
 		refresh: {

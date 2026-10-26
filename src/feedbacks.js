@@ -1,5 +1,5 @@
 import { combineRgb } from '@companion-module/base'
-import { bannerChoices, cueChoices, hasCue, seat, seatChoices, timerState } from './state.js'
+import { bannerChoices, cueChoices, guest, hasCue, seat, seatChoices, slotChoices, timerState } from './state.js'
 
 export const COLOURS = {
 	black: combineRgb(0, 0, 0),
@@ -25,6 +25,8 @@ export function feedbackDefinitions(self) {
 	}
 	const cues = [{ id: 'any', label: 'Any cue' }, ...cueChoices(self.state)]
 	const banners = [{ id: 'any', label: 'Any banner' }, ...bannerChoices(self.state)]
+	const slots = slotChoices(self.state)
+	const slotOption = { id: 'slot', type: 'dropdown', label: 'Guest slot', choices: slots, default: 1, allowCustom: true }
 
 	return {
 		seat_online: {
@@ -103,6 +105,56 @@ export function feedbackDefinitions(self) {
 			callback: ({ options }) => {
 				const t = self.state.timer
 				return !!(t && !t.paused && t.remaining > 0 && t.remaining <= Number(options.seconds))
+			},
+		},
+
+		callin_open: {
+			type: 'boolean',
+			name: 'Call in Q&A: queue is open',
+			defaultStyle: { bgcolor: COLOURS.green, color: COLOURS.white },
+			options: [],
+			callback: () => !!(self.state.callin && self.state.callin.open),
+		},
+
+		callin_waiting: {
+			type: 'boolean',
+			name: 'Call in Q&A: guests waiting',
+			description: 'Counts guests in the queue who still have their page open, or left it in the last 3 minutes',
+			defaultStyle: { bgcolor: COLOURS.amber, color: COLOURS.black },
+			options: [
+				{ id: 'count', type: 'number', label: 'At least this many', default: 1, min: 1, max: 100, asInteger: true },
+			],
+			callback: ({ options }) => !!(self.state.callin && self.state.callin.waiting >= Number(options.count || 1)),
+		},
+
+		callin_slot_live: {
+			type: 'boolean',
+			name: 'Call in Q&A: guest on air in a slot',
+			defaultStyle: { bgcolor: COLOURS.red, color: COLOURS.white },
+			options: [slotOption],
+			callback: ({ options }) => guest(self.state, options.slot) !== null,
+		},
+
+		callin_slot_lost: {
+			type: 'boolean',
+			name: 'Call in Q&A: guest on air has closed their page',
+			description: 'The guest in this slot has not had their page open for the last 25 seconds or so',
+			defaultStyle: { bgcolor: COLOURS.amber, color: COLOURS.black },
+			options: [slotOption],
+			callback: ({ options }) => {
+				const g = guest(self.state, options.slot)
+				return !!(g && !g.online)
+			},
+		},
+
+		callin_slot_cue: {
+			type: 'boolean',
+			name: 'Call in Q&A: guest has a cue',
+			defaultStyle: { bgcolor: COLOURS.blue, color: COLOURS.white },
+			options: [slotOption, { id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'any' }],
+			callback: ({ options }) => {
+				const g = guest(self.state, options.slot)
+				return !!(g && g.cue && (options.cue === 'any' || g.cue === options.cue))
 			},
 		},
 

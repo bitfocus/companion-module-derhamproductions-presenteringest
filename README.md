@@ -1,6 +1,6 @@
 # companion-module-derhamproductions-presenteringest
 
-A [Bitfocus Companion](https://bitfocus.io/companion) module for [Presenter Ingest](https://presenteringest.com), the remote presenter link service by Derham Productions. It runs one booking from Companion: presenter seats on and off, who is on their page, banners, countdowns and cues.
+A [Bitfocus Companion](https://bitfocus.io/companion) module for [Presenter Ingest](https://presenteringest.com), the remote presenter link service by Derham Productions. It runs one booking from Companion: presenter seats on and off, who is on their page, banners, countdowns and cues, and the Call in Q&A audience queue.
 
 See [HELP.md](./companion/HELP.md) for how to use it.
 
@@ -16,14 +16,14 @@ Until it's in Companion's own list of modules:
 
 ## How it talks to Presenter Ingest
 
-The module polls `GET /pi-api/companion/v1/status` and posts changes to `seat`, `cue`, `banner` and `timer` on the same path. It sends the booking's Companion key in the `X-Presenter-Ingest-Key` header:
+The module polls `GET /pi-api/companion/v1/status` and posts changes to `seat`, `cue`, `banner`, `timer` and `callin` on the same path. It sends the booking's Companion key in the `X-Presenter-Ingest-Key` header:
 
 - only to an `https://` address (`http://` only for `localhost`, for development)
 - never in the URL
 - with redirects refused, so the key can't be passed on to another host
 - never in log messages
 
-Companion stores the key as a secret (`secret-text`), separately from the connection's config. The status holds only what Live control shows: seat numbers and names, on/off, whether each presenter's page is open, their cue, the banner and the countdown. It holds no presenter links, emails or studio connection details. With **Show presenter names** off, the module drops the names as each status arrives, so they never reach variables, buttons or Companion's exports.
+Companion stores the key as a secret (`secret-text`), separately from the connection's config. The status holds only what Live control shows: seat numbers and names, on/off, whether each presenter's page is open, their cue, the banner and the countdown; with Call in Q&A, whether the queue is open, how many are waiting, and the name, organisation and question of the next guest and of each guest on air. It holds no presenter links, guest emails, emails or studio connection details. With **Show presenter names** off, the module drops the names (and guests' organisations and questions) as each status arrives, so they never reach variables, buttons or Companion's exports.
 
 ## Development
 
