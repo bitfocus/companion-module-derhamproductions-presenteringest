@@ -59,15 +59,17 @@ export function seat(state, n) {
 }
 
 /**
- * Whether a seat (or, for "all", every seat) has this cue right now. "any" matches any cue;
- * a custom message only matches the same text.
+ * Whether a seat (or, for "all", every seat) has this cue right now. "any" matches any cue.
+ * With a text, a custom message only matches the same text; without one, any custom message.
  */
-export function hasCue(state, n, cue, text = '') {
+export function hasCue(state, n, cue, text) {
 	const seats = n === 'all' ? state.seats : state.seats.filter((s) => s.n === Number(n))
 	return (
 		seats.length > 0 &&
 		seats.every(
-			(s) => s.cue && (cue === 'any' || (s.cue.preset === cue && (cue !== 'custom' || s.cue.text === text))),
+			(s) =>
+				s.cue &&
+				(cue === 'any' || (s.cue.preset === cue && (cue !== 'custom' || text === undefined || s.cue.text === text))),
 		)
 	)
 }
@@ -207,9 +209,7 @@ export function guest(state, n) {
 }
 
 export function slotChoices(state, withFirstFree = false) {
-	const numbers = state.callin
-		? callinSlots(state)
-		: Array.from({ length: MAX_GUEST_SLOTS }, (_, i) => i + 1)
+	const numbers = state.callin ? callinSlots(state) : Array.from({ length: MAX_GUEST_SLOTS }, (_, i) => i + 1)
 	// No guest names here: they change with every call, and the lists are only rebuilt when the slots do
 	const slots = numbers.map((n) => ({ id: n, label: `Guest slot ${n}` }))
 	return withFirstFree ? [{ id: 0, label: 'First free slot' }, ...slots] : slots

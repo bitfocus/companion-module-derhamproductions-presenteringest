@@ -7,14 +7,12 @@ jobs:
   check:
     name: Check module
 
-    # Bitfocus's shared workflow can only check out public repositories: skipped if this one is made private
-    if: ${{ !contains(github.repository, 'companion-module-template-') && !github.event.repository.private }}
+    if: ${{ !contains(github.repository, 'companion-module-template-') }}
 
     permissions:
-      # contents: read lets the shared workflow check out this repository
-      contents: read
       packages: read
 
     uses: bitfocus/actions/.github/workflows/module-checks.yaml@main
     # with:
     #   upload-artifact: true # uncomment this to upload the built package as an artifact to this workflow that you can download and share with others
+

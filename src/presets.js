@@ -397,10 +397,14 @@ export function presetDefinitions(self) {
 							? ''
 							: `Not connected yet, so these are for guest slots 1 to ${slots.length}.`
 				}`.trim(),
+			// Groups only: a section's list can't mix groups and single presets
 			definitions: [
-				'callin_queue',
-				'callin_admit',
-				...slots.map((n) => `callin_slot_${n}`),
+				{
+					id: 'callin-main',
+					type: 'simple',
+					name: 'Queue and guest slots',
+					presets: ['callin_queue', 'callin_admit', ...slots.map((n) => `callin_slot_${n}`)],
+				},
 				...['wrap', 'time', 'thanks'].map((cue) => ({
 					id: `callin-${cue}`,
 					type: 'simple',

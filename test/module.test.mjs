@@ -443,13 +443,23 @@ test('the countdown ticks in Companion between checks', async () => {
 		tickAt: Date.now() - 3200,
 		setVariableValues(values) {
 			shown.push(values.timer)
+			sent.push(...Object.keys(values))
 		},
-		checkAllFeedbacks() {},
+		checkFeedbacks(...ids) {
+			checked.push(...ids)
+		},
+		checkAllFeedbacks() {
+			throw new Error('a tick re-checks only the countdown feedbacks')
+		},
 	}
+	const sent = []
+	const checked = []
 	const tick = () => Instance.prototype.tick.call(self)
 	tick()
 	assert.equal(self.state.timer.remaining, 62)
 	assert.deepEqual(shown, ['1:02'])
+	assert.ok(sent.every((id) => id.startsWith('timer') || id.endsWith('_on_air')), sent.join())
+	assert.deepEqual([...new Set(checked)], ['timer_state', 'timer_low'])
 	// Nothing until another whole second has passed
 	tick()
 	assert.equal(shown.length, 1)
@@ -577,7 +587,7 @@ test('Call in Q&A: variables, feedbacks and presets from the status', () => {
 
 	const [structure, presets] = presetDefinitions(self)
 	const section = structure.find((s) => s.id === 'callin')
-	assert.ok(section.definitions.includes('callin_slot_2'))
+	assert.ok(section.definitions.some((d) => d.presets.includes('callin_slot_2')))
 	assert.match(presets.callin_slot_1.style.text, /\$\(pi:callin_slot_1_on_air\)/)
 	assert.match(presets.callin_slot_1.previewStyle.text, /Bo Sample/)
 	// Ending a call takes a one-second hold; a tap does nothing
@@ -672,6 +682,7 @@ test('time on air ticks in Companion between checks, with no countdown running',
 		setVariableValues(values) {
 			shown.push(values.callin_slot_1_on_air)
 		},
+		checkFeedbacks() {},
 		checkAllFeedbacks() {},
 	}
 	Instance.prototype.tick.call(self)
@@ -682,4 +693,52 @@ test('time on air ticks in Companion between checks, with no countdown running',
 	self.tickAt -= 3000
 	Instance.prototype.tick.call(self)
 	assert.equal(shown.length, 1)
+})
+
+test('review fixes (0.11.1): custom cue feedback, expression-proof dropdowns, preset groups', () => {
+	// M1: "Seat: has a cue" with Custom message lights for any custom message
+	const custom = { ...STATE, seats: [{ n: 1, name: 'Priya', enabled: true, online: true, cue: { preset: 'custom', text: 'Mic check' } }] }
+	const feedbacks = feedbackDefinitions(fakeInstance(custom))
+	assert.equal(feedbacks.seat_cue.callback({ options: { seat: 1, cue: 'custom' } }), true)
+	assert.equal(feedbacks.seat_cue.callback({ options: { seat: 1, cue: 'next' } }), false)
+	// The cue action's toggle still matches the exact message
+	assert.ok(hasCue(custom, 1, 'custom', 'Mic check'))
+	assert.ok(!hasCue(custom, 1, 'custom', 'Other'))
+
+	// M2: every dropdown another field's visibility depends on can't be an expression
+	for (const [id, action] of Object.entries(actionDefinitions(fakeInstance(STATE)))) {
+		const options = action.options || []
+		for (const o of options) {
+			for (const [, ref] of String(o.isVisibleExpression || '').matchAll(/\$\(options:(\w+)\)/g)) {
+				const target = options.find((x) => x.id === ref)
+				assert.equal(target && target.disableAutoExpression, true, `${id}: ${ref} can't be an expression`)
+			}
+		}
+	}
+
+	// M3: no preset section mixes single presets and groups
+	const [structure] = presetDefinitions(fakeInstance({ ...STATE, callin: callinFromStatus(CALLIN) }))
+	for (const section of structure) {
+		const kinds = new Set(section.definitions.map((d) => typeof d))
+		assert.equal(kinds.size, 1, `${section.id} mixes groups and presets`)
+	}
+})
+
+test('review fixes (0.11.1): no key means no fetch, and unexpected errors are logged', async () => {
+	const { default: Instance } = await import('../src/main.js')
+	// L1: a button pressed with no usable key keeps the Bad config status
+	let asked = false
+	const unset = { api: { usable: false, status: async () => (asked = true) }, timer: null }
+	await Instance.prototype.poll.call(unset)
+	assert.equal(asked, false)
+
+	// L2: an error that isn't a reply from the site is logged with what went wrong
+	const logs = []
+	const self = {
+		state: emptyState(),
+		log: (level, text) => logs.push([level, text]),
+		updateStatus() {},
+	}
+	assert.equal(Instance.prototype.failed.call(self, new TypeError('seats.map is not a function')), 10000)
+	assert.deepEqual(logs, [['error', 'Presenter Ingest: seats.map is not a function']])
 })

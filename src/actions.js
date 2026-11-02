@@ -54,7 +54,15 @@ export function actionDefinitions(self) {
 			name: 'Cue: send to a presenter',
 			options: [
 				seatOption(seatsAll, firstSeat),
-				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: cues[0] ? cues[0].id : 'standby' },
+				{
+					id: 'cue',
+					type: 'dropdown',
+					label: 'Cue',
+					choices: cues,
+					default: cues[0] ? cues[0].id : 'standby',
+					// The Custom message field shows by this value, so it can't be an expression
+					disableAutoExpression: true,
+				},
 				{
 					id: 'text',
 					type: 'textinput',
@@ -98,6 +106,7 @@ export function actionDefinitions(self) {
 					label: 'Banner',
 					choices: banners,
 					default: banners[0] ? banners[0].id : 'ok',
+					disableAutoExpression: true,
 				},
 				{
 					id: 'text',
@@ -152,6 +161,7 @@ export function actionDefinitions(self) {
 						{ id: 'until', label: 'To a time of day' },
 					],
 					default: 'minutes',
+					disableAutoExpression: true,
 				},
 				{
 					id: 'minutes',
@@ -338,7 +348,7 @@ export function actionDefinitions(self) {
 			name: 'Call in Q&A: cue a guest',
 			options: [
 				slotOption(),
-				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'wrap' },
+				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'wrap', disableAutoExpression: true },
 				{
 					id: 'text',
 					type: 'textinput',
@@ -376,7 +386,8 @@ export function actionDefinitions(self) {
 
 		refresh: {
 			name: 'Refresh now',
-			description: 'Fetch the booking straight away (it is also checked every second or so).',
+			description:
+				'Fetch the booking straight away. It is also checked every few seconds (Check every, in the connection settings).',
 			options: [],
 			callback: async () => self.poll(),
 		},

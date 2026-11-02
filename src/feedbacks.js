@@ -26,7 +26,14 @@ export function feedbackDefinitions(self) {
 	const cues = [{ id: 'any', label: 'Any cue' }, ...cueChoices(self.state)]
 	const banners = [{ id: 'any', label: 'Any banner' }, ...bannerChoices(self.state)]
 	const slots = slotChoices(self.state)
-	const slotOption = { id: 'slot', type: 'dropdown', label: 'Guest slot', choices: slots, default: 1, allowCustom: true }
+	const slotOption = {
+		id: 'slot',
+		type: 'dropdown',
+		label: 'Guest slot',
+		choices: slots,
+		default: 1,
+		allowCustom: true,
+	}
 
 	return {
 		seat_online: {
@@ -60,7 +67,8 @@ export function feedbackDefinitions(self) {
 				{ ...seatOption, choices: seatChoices(self.state, true, self.presetSeats) },
 				{ id: 'cue', type: 'dropdown', label: 'Cue', choices: cues, default: 'any' },
 			],
-			callback: ({ options }) => hasCue(self.state, options.seat === 'all' ? 'all' : Number(options.seat), String(options.cue)),
+			callback: ({ options }) =>
+				hasCue(self.state, options.seat === 'all' ? 'all' : Number(options.seat), String(options.cue)),
 		},
 
 		banner_shown: {

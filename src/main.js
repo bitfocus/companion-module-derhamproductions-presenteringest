@@ -137,7 +137,8 @@ export default class PresenterIngestInstance extends InstanceBase {
 
 	async poll() {
 		clearTimeout(this.timer)
-		if (this.polling) {
+		// Without a usable address and key, the Bad config status already says what to do
+		if (this.polling || !this.api.usable) {
 			return
 		}
 		this.polling = true
@@ -174,6 +175,8 @@ export default class PresenterIngestInstance extends InstanceBase {
 		const wasConnected = this.state.connected
 		this.state = { ...this.state, connected: false }
 		if (!(e instanceof ApiError)) {
+			// Not a reply from the site (those never hold the key): say what went wrong
+			this.log('error', `Presenter Ingest: ${(e && e.message) || e}`)
 			this.updateStatus(InstanceStatus.UnknownError, 'Unexpected error')
 			return 10000
 		}
@@ -271,8 +274,13 @@ export default class PresenterIngestInstance extends InstanceBase {
 			this.state = { ...this.state, timer: { ...t, remaining: t.remaining - whole } }
 		}
 		if (counting || onAir) {
-			this.setVariableValues(variableValues(this.state, this.presetSeats))
-			this.checkAllFeedbacks()
+			const values = variableValues(this.state, this.presetSeats)
+			this.setVariableValues(
+				Object.fromEntries(Object.entries(values).filter(([id]) => id.startsWith('timer') || id.endsWith('_on_air'))),
+			)
+			if (counting) {
+				this.checkFeedbacks('timer_state', 'timer_low')
+			}
 		}
 	}
 
@@ -300,7 +308,7 @@ export default class PresenterIngestInstance extends InstanceBase {
 		try {
 			await fn(this.api)
 		} catch (e) {
-			const message = e instanceof ApiError ? e.message : 'Unexpected error'
+			const message = e instanceof ApiError ? e.message : `Unexpected error: ${(e && e.message) || e}`
 			this.log('warn', `${what}: ${message}`)
 			if (e instanceof ApiError && e.status === 401) {
 				this.failed(e)
